@@ -3,8 +3,8 @@ title: "Silas_Analysis"
 author: "Max Kuttner"
 date: "25 3 2020"
 output:
-  word_document: default
   html_document: default
+  word_document: default
 ---
 
 ```{r setup, include=FALSE}
@@ -16,6 +16,10 @@ library(ggplot2)
 library(tidyverse)
 library(dplyr)
 library(stats)
+library(xts)
+library(forecast)
+library(stats)
+library(lmtest)
 ```
 
 ```{r setwd, include=FALSE}
@@ -101,6 +105,79 @@ Emm1 %>% arrange(mean)
 Wir sehen durch die ANOVA, dass die Variable **Datum** einen signifikanten Effekt auf den **Preis** hat. Das liest man daraus, dass der p-Wert kleiner als 0.05 ist bei 95% Signifikanzniveau. Das heißt es besteht Grund zur Annahme, dass der **Preis** vom Tag abhängt. **Zeit** hingegen ist nicht signifikant, da der p-Wert deutlich über 0.05 liegt. Das heiß die Nullhyptohese wird in diesem Fall beibehalten. Das heißt es gibt keine signifkanten Unterschiede durch die Variable Zeit. 
 
 Also folgt, dass es egal ist zu welchem Zeitpunkt man ein Ticket kaufen möchte. Wichtig ist nur, dass Montag am Abend nach Estimated marginal mean der beste Zeitpunkt ist ein Ticket zu kaufen.
+
+## Hypothese 2
+**[Je spontaner und kurzfristiger die Kaufentscheidung getroffen wird, desto höher ist der offerierte Preis einer Airline.]**
+
+````{r data_H2}
+# Für alle Flüge pro Datum
+df_time <- df %>% select(Datum, Preis) %>% 
+  group_by(Datum) %>%
+  dplyr::summarise(mean_Preis = mean(Preis))
+
+#create time series
+
+## Create a daily Date object - helps my work on dates
+inds <- seq(as.Date("2019-08-01"), as.Date("2020-01-19"), by = "day")
+
+## Create a time series object
+myts <- ts(df_time[,2],     # Preis-data
+           start = c(2019, as.numeric(format(inds[1], "%j"))),
+           frequency = 365)
+
+fit <- auto.arima(myts)
+
+df_time_fity<- cbind(df_time, as.numeric(fit$fitted))
+colnames(df_time_fity)[3]<- "fitted"
+
+# create forecast:
+#forecast bis zum 1. Februar
+fore <- forecast(fit, h = 13)
+````
+
+**Diese Zeitreihe lässt sich mit einem ARIMA(2,2,1)-Modell modellieren.**
+````{r Arima_H2}
+summary(fit)
+# coefficient-test
+coeftest(fit)
+````
+**Mit diesem Modell kann in weiterer Folge die Zeitrehe angenähert werden und bis zum 1.Februar 2020 vorhergesagt werden.**
+
+````{r TSPlot1_H2, fig.width=15, fig.height=7}
+# Plot 1
+ggplot() +
+  geom_line(data = df_time_fity, aes(x = Datum, y = mean_Preis, color = "Data")) +
+  geom_line(data = df_time_fity, aes(x = Datum, y = fitted, color = "Fitted")) +
+  scale_color_manual(name = "Lines", 
+                     values = c("Data" = "black", "Fitted" = "red")) +
+  ylab("Preis")+
+  ggtitle('Zeitreihe - Flugpreise')
+````
+
+````{r ForecastPlot_H2, fig.width=15, fig.height=7}
+# Plot 2: Forecast
+autoplot(fore) +
+  xlab("Datum") +
+  ylab("Preis") 
+````
+
+````{r TSPlot2_H2, fig.width=15, fig.height=7}
+# Für jeden Flug zu jedem Datum
+df_time <- df %>% select(Flughafen, Airline, Datum, Preis) %>% 
+  mutate(Flughafen = as.character(Flughafen)) %>% 
+  mutate(Airline = as.character(Airline)) %>% 
+  group_by(Flughafen, Airline, Datum) %>%
+  dplyr::summarise(mean_Preis = mean(Preis)) %>% 
+  unite(Flughafen_Airline, c("Flughafen", "Airline"), sep = "")
+
+ggplot(data=df_time, aes(x=Datum, y=mean_Preis)) +
+  geom_line(aes(group = Flughafen_Airline, colour = Flughafen_Airline )) 
+````
+
+
+### Interpretation - H2
+Man kann in allen Plot gut erkennen, dass der Preisverlauf annähernd einem exponentiellen Trend folgt. Dieser Trend (wie im letzten Plot gezeigt) zu einem erheblichen Anteil von den rasanten Preissteigerungen der Flüge 67 und 60 getragen. Das exponentielle Wachstum in der nähe des Abflugsdatums beweist auch unser Forecast, der weiter Preissteigerungen bis zum 1.Februar 2020 vorhersagt. Da die Koeffizienten des ARIMA(2,2,1)-Modells signifkant sind besteht Grund zur Annahme, dass die Preise bei kurzfristigem Buchen stark steigen. Das heißt, die Hypothese 2 wird beibehalten.
+
 
 ## Hypothese 3
 **[Die Wahl des Betriebssystems respektive die Marke des Nutzerendgeräts mit dem die Reise-Website abgerufen wird, hat eine Auswirkung auf den offerierten Preis einer Airline.]**
