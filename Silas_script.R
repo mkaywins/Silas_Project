@@ -5,10 +5,10 @@ library(ggplot2)
 library(tidyverse)
 library(dplyr)
 library(stats)
-setwd("C:/Users/maxku/OneDrive/Documents/Silas")
+setwd("C:/Users/maxku/OneDrive/Documents/Silas/Silas_Project")
 
 # read-in excel data
-df <- readxl::read_excel("C:/Users/maxku/OneDrive/Documents/Silas/Data_Is_Key.xlsx")
+df <- readxl::read_excel("Data_Is_Key.xlsx")
 # check data types
 str(df)
 # rename and convert Data
@@ -57,7 +57,7 @@ Anova1<-jmv::ANOVA(data = df1,
            ),
            emmTables = TRUE
            )
-
+Anova1
 # Emm korrigiert Missverhältnisse aus unterschiedlich großen Sample-Größen für einzelne Tage.
 # Somit wird jeder Tag/Uhrzeit gleich gewertet.
 Emm1<-as_tibble(Anova1$emm[[1]]$emmTable)
@@ -168,3 +168,88 @@ Anova4
 
 Emm4<-as_tibble(Anova4$emm[[1]]$emmTable)
 Emm4
+
+
+
+#--------------------------------------------------------------------------------------------
+# Hypothese 5: Das Zurücksetzen von Cookies respektive dem Browserverlauf erwirkt ein Sinken
+# des offerierten Preises einer Airline.
+#---------------------------------------------------------------------------------------------
+
+
+df5 <- df %>% select(Preis, Cookies)
+
+
+# Deskreptive Statistik:
+jmv::descriptives(df5, vars = c("Preis", "Cookies"), sd = TRUE, missing = TRUE, freq = TRUE)
+
+#---REST IN RMD
+
+
+
+
+#---------------------------------------
+#     HYPOTHESE 2
+#---------------------------------------
+
+# Für alle Flüge pro Datum
+df_time <- df %>% select(Datum, Preis) %>% 
+  group_by(Datum) %>%
+  dplyr::summarise(mean_Preis = mean(Preis))
+
+
+
+
+library(xts)
+library(forecast)
+library(stats)
+library(lmtest)
+
+#create time series
+
+## Create a daily Date object - helps my work on dates
+inds <- seq(as.Date("2019-08-01"), as.Date("2020-01-19"), by = "day")
+
+## Create a time series object
+myts <- ts(df_time[,2],     # Preis-data
+           start = c(2019, as.numeric(format(inds[1], "%j"))),
+           frequency = 365)
+
+fit <- auto.arima(myts)
+
+# coefficient-test
+coeftest(fit)
+
+#forecast bis zum 1. Februar
+fore <- forecast(fit, h = 13)
+
+
+df_time_fity<- cbind(df_time, as.numeric(fit$fitted))
+colnames(df_time_fity)[3]<- "fitted"
+# Plot 1
+ggplot() +
+  geom_line(data = df_time_fity, aes(x = Datum, y = mean_Preis, color = "Data")) +
+  geom_line(data = df_time_fity, aes(x = Datum, y = fitted, color = "Fitted")) +
+  scale_color_manual(name = "Lines", 
+                     values = c("Data" = "black", "Fitted" = "red")) +
+  ylab("Preis")+
+  ggtitle('Zeitreihe - Flugpreise')
+
+# Plot 2: Forecast
+autoplot(fore) +
+  xlab("Datum") +
+  ylab("Preis") 
+
+
+
+
+# Für jeden Flug zu jedem Datum
+df_time <- df %>% select(Flughafen, Airline, Datum, Preis) %>% 
+  mutate(Flughafen = as.character(Flughafen)) %>% 
+  mutate(Airline = as.character(Airline)) %>% 
+  group_by(Flughafen, Airline, Datum) %>%
+  dplyr::summarise(mean_Preis = mean(Preis)) %>% 
+  unite(Flughafen_Airline, c("Flughafen", "Airline"), sep = "")
+
+ggplot(data=df_time, aes(x=Datum, y=mean_Preis)) +
+  geom_line(aes(group = Flughafen_Airline, colour = Flughafen_Airline )) 
