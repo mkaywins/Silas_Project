@@ -49,11 +49,20 @@ df <- df %>% rename(Preis = `Preis (€)`) %>% rename(IP_Adresse = `IP-Adresse`)
 # Modell 1: Preis in Abhängigkeit von Zeit und Datum
 
 # Dazu müssen wir zuerst Datum nach Mo, Di, Mi, ... kategorisieren
-df1 <- df
-df1 <- df1 %>% mutate(Datum = weekdays(Datum)) %>% mutate(Datum = as.factor(Datum)) %>%
-  select(Preis, Datum, Zeit)
+
+df1 <- df %>% mutate(Datum = weekdays(Datum)) %>% mutate(Datum = factor(Datum, levels = c("Montag",
+                                                                                          "Dienstag",
+                                                                                          "Mittwoch",
+                                                                                          "Donnerstag",
+                                                                                          "Freitag",
+                                                                                          "Samstag",
+                                                                                          "Sonntag"))) %>%
+  filter(Device == 0 & Datenzugriff == 0 & Cookies == FALSE & IP_Adresse == FALSE) %>% 
+  select(Preis, Datum, Zeit) 
 
 #str(df1)
+
+levels(df1$Datum)
 ```
 
 ### Deskreptive Statistik:
@@ -102,16 +111,17 @@ Emm1 %>% arrange(mean)
 ````
 
 ### Interpretation - H1
-Wir sehen durch die ANOVA, dass die Variable **Datum** einen signifikanten Effekt auf den **Preis** hat. Das liest man daraus, dass der p-Wert kleiner als 0.05 ist bei 95% Signifikanzniveau. Das heißt es besteht Grund zur Annahme, dass der **Preis** vom Tag abhängt. **Zeit** hingegen ist nicht signifikant, da der p-Wert deutlich über 0.05 liegt. Das heiß die Nullhyptohese wird in diesem Fall beibehalten. Das heißt es gibt keine signifkanten Unterschiede durch die Variable Zeit. 
+Wir sehen durch die ANOVA, dass beide Gruppen keinen signifkante Preisunterschiede aufweisen. Das heißt die Nullhyptohese wird in diesem Fall beibehalten. 
 
-Also folgt, dass es egal ist zu welchem Zeitpunkt man ein Ticket kaufen möchte. Wichtig ist nur, dass Montag am Abend nach Estimated marginal mean der beste Zeitpunkt ist ein Ticket zu kaufen.
+Es folgt, dass es egal ist zu welchem Zeitpunkt man ein Ticket kaufen möchte. Wichtig ist nur, dass Montag am Abend nach Estimated marginal mean der beste Zeitpunkt ist ein Ticket zu kaufen.
 
 ## Hypothese 2
 **[Je spontaner und kurzfristiger die Kaufentscheidung getroffen wird, desto höher ist der offerierte Preis einer Airline.]**
 
 ````{r data_H2}
 # Für alle Flüge pro Datum
-df_time <- df %>% select(Datum, Preis) %>% 
+df_time <- df %>% 
+  filter(Device == 0 & Datenzugriff == 0 & Cookies == FALSE & IP_Adresse == FALSE)%>% select(Datum, Preis) %>% 
   group_by(Datum) %>%
   dplyr::summarise(mean_Preis = mean(Preis))
 
@@ -163,7 +173,9 @@ autoplot(fore) +
 
 ````{r TSPlot2_H2, fig.width=15, fig.height=7}
 # Für jeden Flug zu jedem Datum
-df_time <- df %>% select(Flughafen, Airline, Datum, Preis) %>% 
+df_time <- df %>%
+  filter(Device == 0 & Datenzugriff == 0 & Cookies == FALSE & IP_Adresse == FALSE) %>% 
+  select(Flughafen, Airline, Datum, Preis) %>% 
   mutate(Flughafen = as.character(Flughafen)) %>% 
   mutate(Airline = as.character(Airline)) %>% 
   group_by(Flughafen, Airline, Datum) %>%
@@ -184,7 +196,15 @@ Man kann in allen Plot gut erkennen, dass der Preisverlauf annähernd einem expo
 
 ```{r data_H3}
 #filter data frame
-df3 <- df %>% select(Preis, Device)
+df3 <- df %>%
+  filter(Datenzugriff == 0 & Cookies == TRUE & IP_Adresse == FALSE) %>% 
+  select(Preis, Device)
+
+# Change factor levels:
+df3$Device<-as.numeric(df3$Device)
+df3$Device <- df3$Device - 1
+df3 <- df3 %>% filter(Device %in% c(1,2))
+df3$Device <- as.factor(df3$Device)
 ```
 
 ### Deskreptive Statistik:
@@ -218,34 +238,38 @@ Anova3
 
 ### Interpretation - H3
 
-Nach Emm ist zu beobachten, dass der Mittelwert bei **Macbooks (3)**, ceteris paribus, wesentlich höher ist als bei den anderen Gruppen. Wenn man **FREQUENCIES** betrachtet, dann ist wieder zu erkennen, dass es große Unterschiede in den Sample-Größen der einzelnen Device-Daten gibt. Die ANOVA bestätigt, dass es signifikante Unterschiede zwischen den Gruppen gibt. Das heißt, die Hypothese 3 bestätigt.
+Die ANOVA bestätigt, dass es keine signifikante Unterschiede zwischen den Gruppen gibt. Das heißt, die Hypothese 3 wird verworfen.
 
 ## Hypothese 4
 **[Hypothese 4: Das Abrufen einer Reise-Website mittels Applikation und Website erwirkt einen Unterschied des offerierten Preises einer Airline.]**
 
 ```{r data_H4}
 #filter data frame: Website, Application
-df4 <- df %>% select(Preis, Datenzugriff) 
-# Change factor levels:
-df4$Datenzugriff<-as.numeric(df4$Datenzugriff)
-df4$Datenzugriff <- df4$Datenzugriff - 1
-df4 <- df4 %>% filter(Datenzugriff %in% c(0,1))
-df4$Datenzugriff <- as.factor(df4$Datenzugriff)
+df4 <- df %>%
+  filter(Datenzugriff %in% c(0,1) & Cookies == TRUE & IP_Adresse == FALSE) %>% 
+  select(Preis, Device, Datenzugriff) 
 
+# Change factor levels:
+df4$Device<-as.numeric(df4$Device)
+df4$Device <- df4$Device - 1
+df4 <- df4 %>% filter(Device %in% c(1,3))
+df4$Device <- as.factor(df4$Device)
+
+s#tr(df4)
 ```
 
 ### Deskreptive Statistik:
 
 ```{r DStat_H4, echo=FALSE}
 # Deskreptive Statistik:
-jmv::descriptives(df4, vars = c("Preis", "Datenzugriff"), sd = TRUE, missing = TRUE, freq = TRUE)
+jmv::descriptives(df4, vars = c("Preis", "Device"), sd = TRUE, missing = TRUE, freq = TRUE)
 ```
 
 ### Verteilung - BoxPlot
 ```{r boxplot_H4, fig.width=10, fig.height=7}
 # Plot Box_Plot
-ggplot(df4, aes(Datenzugriff, Preis)) +
-  geom_boxplot(aes(fill = Datenzugriff), show.legend = TRUE) +
+ggplot(df4, aes(Device, Preis)) +
+  geom_boxplot(aes(fill = Device), show.legend = TRUE) +
   geom_point()
 ```
 
@@ -255,10 +279,10 @@ ggplot(df4, aes(Datenzugriff, Preis)) +
 
 Anova4<-jmv::ANOVA(data = df4, 
                    dep = "Preis",
-                   factors = c("Datenzugriff"),
-                   modelTerms = list("Datenzugriff"),
+                   factors = c("Device"),
+                   modelTerms = list("Device"),
                    effectSize = "partEta",
-                   emMeans = list("Datenzugriff"
+                   emMeans = list("Device"
                    ),
                    emmTables = TRUE)
 Anova4
@@ -266,14 +290,18 @@ Anova4
 
 ### Interpretation - H4
 
-In der deskreptiven Statistik haben wir wieder ein große Ungleichheit der Sample-Größen. Allerdings lässt sich ein signifikanter Unterschied im Preis zwischen den zwei Gruppen feststellen. Der Emm-Table zeigt, dass der niedrigste Preis im Schnitt, ceteris paribus, mit **Applications (0)** erzielt wird. Allerdings sei erwähnt, dass sich die Sample-Größen wieder auf den Standardfehler der 2 Gruppen auswirken. Es besteht Beweis für die Hypothese 4. Diese wird daher beibehalten.
+ Es lässt sich ein signifikanter Unterschied im Preis zwischen den zwei Gruppen feststellen. Der Emm-Table zeigt, dass der höhere Preis bei Mac-Books (3) angeboten wird. Es besteht Beweis für die Hypothese 4. Diese wird daher beibehalten.
 
-## Hypothese 5
+## Hypothese 6
 **[Das Zurücksetzen von Cookies respektive dem Browserverlauf erwirkt ein Sinken des offerierten Preises einer Airline.]**
 
 ````{r data_H5}
+# H6 = H5
+
 # filter data
-df5 <- df %>% select(Preis, Cookies)
+df5 <- df %>%
+  filter(Datenzugriff == 0 & IP_Adresse == FALSE & Device %in% c(0, 1)) %>% 
+  select(Preis, Cookies, Device)
 colnames(df5)[2]<-"Cookies_reset"
 ````
 
@@ -307,16 +335,18 @@ Anova5<-jmv::ANOVA(data = df5,
 Anova5
 ```
 
-### Interpretation - H5
+### Interpretation - H6
 
-Zunächst gibt es wieder eine große Ungleichheit zwischen den erfassten Cookie-Daten. Zu beachten ist, dass die Variable cookies_reset eine binäre Variable darstellt und die Codierung TRUE = 'zurückgesetzt' und FALSE = 'Zugelassen' beinhaltet. Nach der einfaktoriellen ANOVA ist nach dem p-Wert die Nullhypothese zu verwerfen. Das heißt, es gibt einen signifikanten Unterschied zwischen den zwei Gruppen, ceteris paribus. Bei Betrachtung des Emm ist ersichtlich, dass das **Zurücksetzen** der Cookies mit einem höheren mittleren Preis verbunden ist.
+Zunächst gibt es wieder eine große Ungleichheit zwischen den erfassten Cookie-Daten. Zu beachten ist, dass die Variable cookies_reset eine binäre Variable darstellt und die Codierung TRUE = 'zurückgesetzt' und FALSE = 'Zugelassen' beinhaltet. Nach der einfaktoriellen ANOVA ist nach dem p-Wert die Nullhypothese beizubehalten. Das heißt, es gibt einen signifikanten Unterschied zwischen den zwei Gruppen, ceteris paribus. 
 
-## Hypothese 6
+## Hypothese 7
 **[Das Verbergen der Internetprotokoll-Adresse und folglich der ortsspezifischen Parameter mittels Virtual Private Network verursacht eine Differenz im offerierten Preis einer Airline.]**
 
 ````{r data_H6}
 # filter data
-df6 <- df %>% select(Preis, IP_Adresse)
+df6 <- df %>% 
+  filter(Device == 3 & Datenzugriff == 1 & Cookies == TRUE) %>% 
+  select(Preis, IP_Adresse)
 colnames(df6)[2]<-"IP_Adresse_hidden"
 ````
 
@@ -350,17 +380,19 @@ Anova5<-jmv::ANOVA(data = df6,
 Anova5
 ```
 
-### Interpretation - H6
+### Interpretation - H7
 
-Es gibt wieder eine sehr große Ungleichheit zwischen den erfassten IP-Adressen-Daten. Zu beachten ist, dass die Variable IP_Adresse_hidden eine binäre Variable darstellt und die Codierung TRUE = 'verborgen' und FALSE = 'sichtbar' beinhaltet. Nach der einfaktoriellen ANOVA ist nach dem p-Wert die Nullhypothese zu verwerfen. Das heißt, es gibt einen signifikanten Unterschied im Mittelwert der zwei Gruppen, ceteris paribus. Bei Betrachtung des Emm ist ersichtlich, dass das **Verbergen** der Cookies mit einem höheren mittleren Preis verbunden ist.
+Es gibt eine Ungleichheit zwischen den erfassten IP-Adressen-Daten. Zu beachten ist, dass die Variable IP_Adresse_hidden eine binäre Variable darstellt und die Codierung TRUE = 'verborgen' und FALSE = 'sichtbar' beinhaltet. Nach der einfaktoriellen ANOVA ist nach dem p-Wert die Nullhypothese beizubehalten. Das heißt, es gibt keinen signifikanten Unterschied im Mittelwert der zwei Gruppen. Bei Betrachtung des Emm ist ersichtlich, dass das **Verbergen** der Cookies mit einem vermutlich höheren mittleren Preis verbunden ist.
 
 
-## Hypothese 7
+## Hypothese 8
 **[Das Abrufen eines Flugpreises via Reise-Website führt, verglichen mit der Website der Airline selbst, zu einem höheren offerierten Preis.]**
 
 ```{r data_H7}
 #filter data frame: Website, Application
-df7 <- df %>% select(Preis, Datenzugriff) 
+df7 <- df %>% 
+  filter(Device == 3 & Cookies == TRUE & IP_Adresse == FALSE) %>% 
+  select(Preis, Datenzugriff) 
 # Change factor levels:
 df7$Datenzugriff<-as.numeric(df7$Datenzugriff)
 df7$Datenzugriff <- df7$Datenzugriff - 1
@@ -398,9 +430,9 @@ Anova7<-jmv::ANOVA(data = df7,
 Anova7
 ```
 
-### Interpretation - H7
+### Interpretation - H8
 
-Die Unterschiede sind nicht signfikant. Das heißt, die Nullhypothese wird beibehalten. Es konnte nicht nachgewiesen werden, dass es unterschiedliche Preise für **Website (1)** und **Reise-Website (2)** gibt. Zudem gibt es wieder krasse Disbalancen zwischen den Sample-Größen der Merkmale.
+Die Unterschiede sind nicht signfikant. Das heißt, die Nullhypothese wird beibehalten. Es konnte nicht nachgewiesen werden, dass es unterschiedliche Preise für **Website (1)** und **Reise-Website (2)** gibt. Zudem gibt es Disbalancen zwischen den Sample-Größen der Merkmale.
 
 
 
