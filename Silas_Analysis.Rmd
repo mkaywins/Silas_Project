@@ -3,9 +3,9 @@ title: "Silas_Analysis"
 author: "Max Kuttner"
 date: "25 3 2020"
 output:
-  word_document: default
   html_document: default
   pdf_document: default
+  word_document: default
 ---
 
 ```{r setup, include=FALSE}
@@ -186,6 +186,45 @@ df_time <- df %>%
 ggplot(data=df_time, aes(x=Datum, y=mean_Preis)) +
   geom_line(aes(group = Flughafen_Airline, colour = Flughafen_Airline )) 
 ````
+
+
+````{r forecast_every_single_flug, fig.width=15, fig.height=7, warning = FALSE}
+
+
+for (flug in unique(df_time$Flughafen_Airline)){
+  
+  df_time_single <- df_time %>% filter(Flughafen_Airline == flug)
+  #create time series
+  
+  ## Create a time series object
+  myts <- ts(df_time_single[,3],     # Preis-data
+             start = c(2019, as.numeric(format(inds[2], "%j"))),
+             frequency = 365)
+  
+  fit <- auto.arima(myts)
+  
+  df_time_fity<- cbind(df_time_single, as.numeric(fit$fitted))
+  colnames(df_time_fity)[4]<- "fitted"
+  
+  # create forecast:
+  #forecast bis zum 1. Februar
+  fore <- forecast(fit, h = 13)
+  
+    #summary(fit)
+  # coefficient-test
+  #coeftest(fit)
+  
+
+    gplot <- autoplot(fore) +
+    xlab("Datum") +
+    ylab("Preis") +
+    ggplot2::ggtitle(paste('Forecast - Flug:', flug, '/ Model:', fore$method, sep = ' '))
+    
+    print(gplot)
+}
+````
+
+
 
 
 ### Interpretation - H2
