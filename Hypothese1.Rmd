@@ -1,0 +1,98 @@
+---
+title: "Hypothese 1"
+author: "Silas Nöttling & Maximilian Kuttner"
+date: "12 4 2020"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+```{r libs, include=FALSE}
+library(ggplot2)
+library(tidyverse)
+library(dplyr)
+library(stats)
+library(xts)
+library(forecast)
+library(stats)
+library(lmtest)
+```
+
+```{r setwd, include=FALSE}
+setwd("C:/Users/maxku/OneDrive/Documents/Silas/Silas_Project")
+```
+
+```{r readxlsx}
+# read-in excel data
+df <- readxl::read_excel("Data_Is_Key.xlsx")
+```
+
+```{r datawrangling, include=FALSE}
+# rename and convert Data
+df <- df %>% rename(Datum = `Datum (jjmmtt)`) %>% mutate(Datum = as.Date(Datum, format = "%y%m%d"))
+
+df <- df %>% mutate_at(c("Flughafen", "Airline", "Zeit", "Device", "Datenzugriff"), as.factor) %>% 
+  mutate_at(c("Cookies", "IP-Adresse"), as.logical)
+
+df <- df %>% rename(Preis = `Preis (€)`) %>% rename(IP_Adresse = `IP-Adresse`)
+
+
+```
+
+# Hypothese 1 - Einzelflüge
+```{r data_H1, echo=FALSE}
+# 1)
+# Modell 1: Preis in Abhängigkeit von Zeit und Datum
+
+# Dazu müssen wir zuerst Datum nach Mo, Di, Mi, ... kategorisieren
+
+df1 <- df %>% mutate(Datum = weekdays(Datum)) %>% mutate(Datum = factor(Datum, levels = c("Montag",
+                                                                                          "Dienstag",
+                                                                                          "Mittwoch",
+                                                                                          "Donnerstag",
+                                                                                          "Freitag",
+                                                                                          "Samstag",
+                                                                                          "Sonntag"))) %>%
+  filter(Device == 0 & Datenzugriff == 0 & Cookies == FALSE & IP_Adresse == FALSE) %>% 
+  unite(Flughafen_Airline, c("Flughafen", "Airline"), sep = "") %>% 
+  select(Flughafen_Airline,Preis, Datum, Zeit) 
+
+
+#levels(df1$Datum)
+#str(df)
+```
+
+
+````{r}
+
+for (flug in unique(df1$Flughafen_Airline)){
+  df1_single <- df1 %>% dplyr::filter(Flughafen_Airline == flug)
+  
+  jmv::descriptives(df1_single, vars = c("Preis", "Datum", "Zeit"), sd = TRUE, missing = TRUE, freq = TRUE)
+
+  # Plot Box_Plot
+  gp<-ggplot(df1_single, aes(Datum, Preis)) +
+    geom_boxplot(aes(fill = Datum), show.legend = TRUE) +
+    geom_point() +
+    facet_wrap(~Zeit) +
+    ggtitle(paste('Flug:', flug))
+  
+  print(gp)
+  # Mehrfakorielle ANOVA:
+  
+  Anova1<-jmv::ANOVA(data = df1_single, 
+                     dep = "Preis",
+                     factors = c("Datum", "Zeit"),
+                     modelTerms = list("Datum", "Zeit"),
+                     effectSize = "partEta",
+                     emMeans = list(
+                       c("Datum", "Zeit")
+                     ),
+                     emmTables = TRUE
+  )
+  Anova1
+}
+
+````
