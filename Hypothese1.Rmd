@@ -42,7 +42,7 @@ df <- df %>% rename(Preis = `Preis (€)`) %>% rename(IP_Adresse = `IP-Adresse`)
 ```
 
 # Hypothese 1 - Einzelflüge
-```{r data_H1, echo=FALSE}
+```{r data_H1, fig.width=15, fig.height=7}
 # 1)
 # Modell 1: Preis in Abhängigkeit von Zeit und Datum
 
@@ -64,8 +64,21 @@ df1 <- df %>% mutate(Datum = weekdays(Datum)) %>% mutate(Datum = factor(Datum, l
 #str(df)
 ```
 
-
+## Deskriptive Statistik - Einzelflüge
 ````{r}
+temp <- c()
+for (flug in unique(df1$Flughafen_Airline)){
+  df1_single <- df1 %>% dplyr::filter(Flughafen_Airline == flug)
+  
+  temp <- c(temp, jmv::descriptives(df1_single, vars = c("Preis", "Datum", "Zeit"), sd = TRUE, missing = TRUE, freq = TRUE))
+}
+names(temp) <- paste('Flug:', unique(df1$Flughafen_Airline))
+temp
+````
+
+
+## Box-Plot - Einzelflüge
+````{r, fig.width=15, fig.height=7}
 
 for (flug in unique(df1$Flughafen_Airline)){
   df1_single <- df1 %>% dplyr::filter(Flughafen_Airline == flug)
@@ -80,6 +93,17 @@ for (flug in unique(df1$Flughafen_Airline)){
     ggtitle(paste('Flug:', flug))
   
   print(gp)
+
+}
+
+````
+
+
+````{r, fig.width=15, fig.height=7}
+temp <- c()
+for (flug in unique(df1$Flughafen_Airline)){
+  df1_single <- df1 %>% dplyr::filter(Flughafen_Airline == flug)
+  
   # Mehrfakorielle ANOVA:
   
   Anova1<-jmv::ANOVA(data = df1_single, 
@@ -92,7 +116,8 @@ for (flug in unique(df1$Flughafen_Airline)){
                      ),
                      emmTables = TRUE
   )
-  Anova1
+  temp <- c(temp, Anova1)
 }
-
+names(temp) <- paste('Flug:', unique(df1$Flughafen_Airline))
+temp
 ````
