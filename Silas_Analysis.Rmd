@@ -132,6 +132,7 @@ df_time <- df %>%
 
 ## Create a daily Date object - helps my work on dates
 inds <- seq(as.Date("2019-08-01"), as.Date("2020-01-19"), by = "day")
+inds <- as.POSIXlt(inds)
 
 ## Create a time series object
 myts <- ts(df_time[,2],     # Preis-data
@@ -168,10 +169,13 @@ ggplot() +
 ````
 
 ````{r ForecastPlot_H2, fig.width=15, fig.height=7}
+library(lubridate)
 # Plot 2: Forecast
+
 autoplot(fore) +
   xlab("Datum") +
   ylab("Preis") 
+
 ````
 
 ````{r TSPlot2_H2, fig.width=15, fig.height=7}
@@ -240,13 +244,15 @@ Man kann in allen Plot gut erkennen, dass der Preisverlauf annähernd einem expo
 #filter data frame
 df3 <- df %>%
   filter(Datenzugriff == 0 & Cookies == TRUE & IP_Adresse == FALSE) %>% 
-  select(Preis, Device)
+  select(Preis, Device, Datum)
 
 # Change factor levels:
 df3$Device<-as.numeric(df3$Device)
 df3$Device <- df3$Device - 1
 df3 <- df3 %>% filter(Device %in% c(1,2))
 df3$Device <- as.factor(df3$Device)
+
+levels(df3$Device) <- c("Website", "Reise-Website")
 ```
 
 ### Deskreptive Statistik:
@@ -276,11 +282,13 @@ Anova3<-jmv::ANOVA(data = df3,
                    emmTables = TRUE)
 Anova3
 ```
+````{r, fig.width=10, fig.height=7}
+ggplot(data = df3, aes(x=Datum, y=Preis)) +
+  geom_line(aes(group = Device, colour = Device)) +
+  geom_point(aes(group = Device, colour = Device))
 
 
-### Interpretation - H3
-
-Die ANOVA bestätigt, dass es keine signifikante Unterschiede zwischen den Gruppen gibt. Das heißt, die Hypothese 3 wird verworfen.
+````
 
 ## Hypothese 4
 **[Hypothese 4: Das Abrufen einer Reise-Website mittels Applikation und Website erwirkt einen Unterschied des offerierten Preises einer Airline.]**

@@ -1,0 +1,114 @@
+---
+title: "Hypothese 3"
+author: "Silas Nöttling & Maximilian Kuttner"
+date: "14 4 2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+```{r libs, include=FALSE}
+library(ggplot2)
+library(tidyverse)
+library(dplyr)
+library(stats)
+library(xts)
+library(forecast)
+library(stats)
+library(lmtest)
+```
+
+```{r setwd, include=FALSE}
+setwd("C:/Users/maxku/OneDrive/Documents/Silas/Silas_Project")
+```
+
+```{r readxlsx}
+# read-in excel data
+df <- readxl::read_excel("Data_Is_Key.xlsx")
+```
+
+```{r datawrangling, include=FALSE}
+# rename and convert Data
+df <- df %>% rename(Datum = `Datum (jjmmtt)`) %>% mutate(Datum = as.Date(Datum, format = "%y%m%d"))
+
+df <- df %>% mutate_at(c("Flughafen", "Airline", "Zeit", "Device", "Datenzugriff"), as.factor) %>% 
+  mutate_at(c("Cookies", "IP-Adresse"), as.logical)
+
+df <- df %>% rename(Preis = `Preis (€)`) %>% rename(IP_Adresse = `IP-Adresse`)
+
+
+```
+
+````{r}
+#filter data frame
+df3 <- df %>%
+  filter(Datenzugriff == 0 & Cookies == TRUE & IP_Adresse == FALSE) %>% 
+  unite(Flughafen_Airline, c("Flughafen", "Airline"), sep = "") %>% 
+  select(Preis, Device, Datum, Flughafen_Airline)
+
+# Change factor levels:
+df3$Device<-as.numeric(df3$Device)
+df3$Device <- df3$Device - 1
+df3 <- df3 %>% filter(Device %in% c(1,2))
+df3$Device <- as.factor(df3$Device)
+
+levels(df3$Device) <- c("Website", "Reise-Website")
+````
+
+
+
+## Deskriptive Statistik - Einzelflüge
+````{r}
+temp <- c()
+for (flug in unique(df3$Flughafen_Airline)){
+  df3_single <- df3 %>% dplyr::filter(Flughafen_Airline == flug)
+  # Deskreptive Statistik:
+    temp <- c(temp, jmv::descriptives(df3_single, vars = c("Preis", "Device"), sd = TRUE, missing = TRUE, freq = TRUE))
+
+  
+}
+names(temp) <- paste('Flug:', unique(df3$Flughafen_Airline))
+temp
+````
+
+
+## Box-Plot - Einzelflüge
+````{r, fig.width=15, fig.height=7}
+
+for (flug in unique(df3$Flughafen_Airline)){
+  df3_single <- df3 %>% dplyr::filter(Flughafen_Airline == flug)
+  
+  # Plot Box_Plot
+  gp<-ggplot(df3_single, aes(Device, Preis)) +
+    geom_boxplot(aes(fill = Device), show.legend = TRUE) +
+    geom_point() +
+    ggtitle(paste('Flug:', flug))
+  
+  print(gp)
+
+}
+
+````
+
+
+````{r, fig.width=15, fig.height=7}
+temp <- c()
+for (flug in unique(df3$Flughafen_Airline)){
+  df3_single <- df3 %>% dplyr::filter(Flughafen_Airline == flug)
+  
+  # Mehrfakorielle ANOVA:
+  
+  Anova3<-jmv::ANOVA(data = df3_single, 
+                   dep = "Preis",
+                   factors = c("Device"),
+                   emMeans = list("Device"
+                   ),
+                   emmTables = TRUE,
+                   emmPlots = FALSE)
+  temp <- c(temp, Anova3)
+}
+names(temp) <- paste('Flug:', unique(df3$Flughafen_Airline))
+temp
+````
