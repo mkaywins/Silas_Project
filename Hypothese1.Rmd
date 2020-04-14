@@ -58,7 +58,8 @@ df1 <- df %>% mutate(Datum = weekdays(Datum)) %>% mutate(Datum = factor(Datum, l
   filter(Device == 0 & Datenzugriff == 0 & Cookies == FALSE & IP_Adresse == FALSE) %>% 
   unite(Flughafen_Airline, c("Flughafen", "Airline"), sep = "") %>% 
   select(Flughafen_Airline,Preis, Datum, Zeit) 
-
+# rename levels für Zeit
+levels(df1$Zeit) <- c("Morgen", "Mittag", "Abend")
 
 #levels(df1$Datum)
 #str(df)

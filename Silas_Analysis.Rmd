@@ -3,8 +3,8 @@ title: "Silas_Analysis"
 author: "Max Kuttner"
 date: "25 3 2020"
 output:
-  word_document: default
   pdf_document: default
+  word_document: default
   html_document: default
 ---
 
@@ -40,6 +40,8 @@ df <- df %>% mutate_at(c("Flughafen", "Airline", "Zeit", "Device", "Datenzugriff
   mutate_at(c("Cookies", "IP-Adresse"), as.logical)
 
 df <- df %>% rename(Preis = `Preis (€)`) %>% rename(IP_Adresse = `IP-Adresse`)
+
+
 ```
 
 ## Hypothese 1
@@ -59,11 +61,12 @@ df1 <- df %>% mutate(Datum = weekdays(Datum)) %>% mutate(Datum = factor(Datum, l
                                                                                           "Samstag",
                                                                                           "Sonntag"))) %>%
   filter(Device == 0 & Datenzugriff == 0 & Cookies == FALSE & IP_Adresse == FALSE) %>% 
-  select(Preis, Datum, Zeit) 
+  unite(Flughafen_Airline, c("Flughafen", "Airline"), sep = "") %>% 
+  select(Flughafen_Airline,Preis, Datum, Zeit) 
 
-#str(df1)
-
-levels(df1$Datum)
+levels(df1$Zeit) <- c("Morgen", "Mittag", "Abend")
+#levels(df1$Datum)
+#str(df)
 ```
 
 ### Deskreptive Statistik:
@@ -99,6 +102,10 @@ Anova1<-jmv::ANOVA(data = df1,
 Anova1
 ```
 
+
+
+
+
 ```{r EMM1_H1}
 # Emm korrigiert Missverhältnisse aus unterschiedlich großen Sample-Größen für einzelne Tage.
 # Somit wird jeder Tag/Uhrzeit gleich gewertet.
@@ -110,11 +117,6 @@ Im folgenden werden Tage und Uhrzeiten nach ihrem mean (also **Preis**) angeordn
 ````{r EMM2_H1}
 Emm1 %>% arrange(mean)
 ````
-
-### Interpretation - H1
-Wir sehen durch die ANOVA, dass beide Gruppen keinen signifkante Preisunterschiede aufweisen. Das heißt die Nullhyptohese wird in diesem Fall beibehalten. 
-
-Es folgt, dass es egal ist zu welchem Zeitpunkt man ein Ticket kaufen möchte. Wichtig ist nur, dass Montag am Abend nach Estimated marginal mean der beste Zeitpunkt ist ein Ticket zu kaufen.
 
 ## Hypothese 2
 **[Je spontaner und kurzfristiger die Kaufentscheidung getroffen wird, desto höher ist der offerierte Preis einer Airline.]**
