@@ -18,6 +18,7 @@ library(tidyverse)
 library(dplyr)
 library(stats)
 library(xts)
+library(data.table)
 library(forecast)
 library(stats)
 library(lmtest)
@@ -41,7 +42,8 @@ df <- df %>% mutate_at(c("Flughafen", "Airline", "Zeit", "Device", "Datenzugriff
 
 df <- df %>% rename(Preis = `Preis (€)`) %>% rename(IP_Adresse = `IP-Adresse`)
 
-
+levels(df$Flughafen) <- c('Amsterdam', 'Berlin', 'Lissabon', 'London', 'Bangkok', 'New York', 'Tokio')
+levels(df$Airline) <- c('AUA', 'KLM', 'EZY', 'LDM', 'BAW', 'THA', 'UAL', 'ANA')
 ```
 
 ## Hypothese 1
@@ -124,7 +126,8 @@ Emm1 %>% arrange(mean)
 ````{r data_H2}
 # Für alle Flüge pro Datum
 df_time <- df %>% 
-  filter(Device == 0 & Datenzugriff == 0 & Cookies == FALSE & IP_Adresse == FALSE)%>% select(Datum, Preis) %>% 
+  filter(Device == 0 & Datenzugriff == 0 & Cookies == FALSE & IP_Adresse == FALSE)%>%
+  select(Datum, Preis) %>% 
   group_by(Datum) %>%
   dplyr::summarise(mean_Preis = mean(Preis))
 
@@ -187,7 +190,7 @@ df_time <- df %>%
   mutate(Airline = as.character(Airline)) %>% 
   group_by(Flughafen, Airline, Datum) %>%
   dplyr::summarise(mean_Preis = mean(Preis)) %>% 
-  unite(Flughafen_Airline, c("Flughafen", "Airline"), sep = "")
+  unite(Flughafen_Airline, c("Flughafen", "Airline"), sep = "-")
 
 ggplot(data=df_time, aes(x=Datum, y=mean_Preis)) +
   geom_line(aes(group = Flughafen_Airline, colour = Flughafen_Airline )) 
@@ -230,12 +233,25 @@ for (flug in unique(df_time$Flughafen_Airline)){
 }
 ````
 
+````{r, fig.width=15, fig.height=7, warning = FALSE}
+df_time_rel <- df %>%
+  filter(Device == 0 & Datenzugriff == 0 & Cookies == FALSE & IP_Adresse == FALSE) %>% 
+  select(Flughafen, Airline, Datum, Preis) %>% 
+  mutate(Flughafen = as.character(Flughafen)) %>% 
+  mutate(Airline = as.character(Airline)) %>% 
+  group_by(Flughafen, Airline, Datum) %>% 
+  dplyr::summarise(mean_Preis = mean(Preis)) %>% 
+  unite(Flughafen_Airline, c("Flughafen", "Airline"), sep = "-")
+
+df_time_rel<-do.call(rbind, by(df_time_rel, df_time_rel$Flughafen_Airline, function(x)
+  if (anyNA(x$mean_Preis)) return(cbind(x, output=NA))
+  else return (cbind(x, output=c(1, 1/x$mean_Preis[-length(x$mean_Preis)]*c(x$mean_Preis[-1]))))))
 
 
-
-### Interpretation - H2
-Man kann in allen Plot gut erkennen, dass der Preisverlauf annähernd einem exponentiellen Trend folgt. Dieser Trend (wie im letzten Plot gezeigt) zu einem erheblichen Anteil von den rasanten Preissteigerungen der Flüge 67 und 60 getragen. Das exponentielle Wachstum in der nähe des Abflugsdatums beweist auch unser Forecast, der weiter Preissteigerungen bis zum 1.Februar 2020 vorhersagt. Da die Koeffizienten des ARIMA(2,2,1)-Modells signifkant sind besteht Grund zur Annahme, dass die Preise bei kurzfristigem Buchen stark steigen. Das heißt, die Hypothese 2 wird beibehalten.
-
+ggplot(data=df_time_rel, aes(x=Datum, y=output)) +
+  geom_line(aes(group = Flughafen_Airline, colour = Flughafen_Airline )) +
+  ggtitle('Relative Veränderung - Flugpreise pro Flug')
+````
 
 ## Hypothese 3
 **[Die Wahl des Betriebssystems respektive die Marke des Nutzerendgeräts mit dem die Reise-Website abgerufen wird, hat eine Auswirkung auf den offerierten Preis einer Airline.]**
@@ -282,13 +298,6 @@ Anova3<-jmv::ANOVA(data = df3,
                    emmTables = TRUE)
 Anova3
 ```
-````{r, fig.width=10, fig.height=7}
-ggplot(data = df3, aes(x=Datum, y=Preis)) +
-  geom_line(aes(group = Device, colour = Device)) +
-  geom_point(aes(group = Device, colour = Device))
-
-
-````
 
 ## Hypothese 4
 **[Hypothese 4: Das Abrufen einer Reise-Website mittels Applikation und Website erwirkt einen Unterschied des offerierten Preises einer Airline.]**
@@ -297,7 +306,8 @@ ggplot(data = df3, aes(x=Datum, y=Preis)) +
 #filter data frame: Website, Application
 df4 <- df %>%
   filter(Datenzugriff %in% c(0,1) & Cookies == TRUE & IP_Adresse == FALSE) %>% 
-  select(Preis, Device, Datenzugriff) 
+  select(Datum, Preis, Device) 
+
 
 # Change factor levels:
 df4$Device<-as.numeric(df4$Device)
@@ -305,7 +315,14 @@ df4$Device <- df4$Device - 1
 df4 <- df4 %>% filter(Device %in% c(1,3))
 df4$Device <- as.factor(df4$Device)
 
-#str(df4)
+#Join equal dates:
+
+df4_1 <- df4 %>% dplyr::filter(Device == 1)
+df4_3 <- df4 %>% dplyr::filter(Device == 3)
+df4_date <- df4_1 %>% dplyr::inner_join(df4_3, by = 'Datum') %>% select(Datum) %>% unique()
+df4 <- df4 %>% dplyr::filter(Datum %in% df4_date$Datum)
+
+levels(df4$Device) <- c('Apple Ipad', 'Mac Book')
 ```
 
 ### Deskreptive Statistik:
@@ -338,10 +355,6 @@ Anova4<-jmv::ANOVA(data = df4,
 Anova4
 ```
 
-### Interpretation - H4
-
- Es lässt sich ein signifikanter Unterschied im Preis zwischen den zwei Gruppen feststellen. Der Emm-Table zeigt, dass der höhere Preis bei Mac-Books (3) angeboten wird. Es besteht Beweis für die Hypothese 4. Diese wird daher beibehalten.
-
 ## Hypothese 6
 **[Das Zurücksetzen von Cookies respektive dem Browserverlauf erwirkt ein Sinken des offerierten Preises einer Airline.]**
 
@@ -351,21 +364,49 @@ Anova4
 # filter data
 df5 <- df %>%
   filter(Datenzugriff == 0 & IP_Adresse == FALSE & Device %in% c(0, 1)) %>% 
-  select(Preis, Cookies, Device)
-colnames(df5)[2]<-"Cookies_reset"
+  select(Preis, Cookies, Datum, Zeit) %>% 
+  unite(DatumZeit, c("Datum", "Zeit"), sep = "")
+#colnames(df5)[2]<-"Cookies_reset"
+
+
+# filter data
+df5.1 <- df %>%
+  filter(Datenzugriff == 0 & IP_Adresse == FALSE & Device == 0 & Cookies == FALSE) %>% 
+  select(Preis, Cookies, Datum, Zeit) %>% 
+  unite(DatumZeit, c("Datum", "Zeit"), sep = "")
+
+df5.2 <- df %>%
+  filter(Datenzugriff == 0 & IP_Adresse == FALSE & Device == 1 & Cookies == TRUE) %>% 
+  select(Preis, Cookies, Datum, Zeit)%>% 
+  unite(DatumZeit, c("Datum", "Zeit"), sep = "")
+
+
+#colnames(df5.1)[2]<-"Cookies_reset"
+#colnames(df5.2)[2]<-"Cookies_reset"
+
+
+#Join equal dates:
+
+df5_1 <- df5.1
+df5_3 <- df5.2
+df5_date <- df5_1 %>% dplyr::inner_join(df5_3, by = 'DatumZeit') %>% select(DatumZeit) %>% unique()
+df5 <- df5 %>% dplyr::filter(DatumZeit %in% df5_date$DatumZeit)
+
+df5$Cookies <- factor(df5$Cookies)
+levels(df5$Cookies) <- c('Zugelassen', 'Zurueckgesetzt')
 ````
 
 ### Deskreptive Statistik:
 ````{r DStat_H5}
 # Deskreptive Statistik:
-jmv::descriptives(df5, vars = c("Preis", "Cookies_reset"), sd = TRUE, missing = TRUE, freq = TRUE)
+jmv::descriptives(df5, vars = c("Preis", "Cookies"), sd = TRUE, missing = TRUE, freq = TRUE)
 ````
 
 ### Verteilung - BoxPlot
 ```{r boxplot_H5, fig.width=10, fig.height=7}
 # Plot Box_Plot
-ggplot(df5, aes(Cookies_reset, Preis)) +
-  geom_boxplot(aes(fill = Cookies_reset), show.legend = TRUE) +
+ggplot(df5, aes(Cookies, Preis)) +
+  geom_boxplot(aes(fill = Cookies), show.legend = TRUE) +
   geom_point()
 ```
 
@@ -376,18 +417,14 @@ ggplot(df5, aes(Cookies_reset, Preis)) +
 
 Anova5<-jmv::ANOVA(data = df5, 
                    dep = "Preis",
-                   factors = c("Cookies_reset"),
-                   modelTerms = list("Cookies_reset"),
+                   factors = c("Cookies"),
+                   modelTerms = list("Cookies"),
                    effectSize = "partEta",
-                   emMeans = list("Cookies_reset"
+                   emMeans = list("Cookies"
                    ),
                    emmTables = TRUE)
 Anova5
 ```
-
-### Interpretation - H6
-
-Zunächst gibt es wieder eine große Ungleichheit zwischen den erfassten Cookie-Daten. Zu beachten ist, dass die Variable cookies_reset eine binäre Variable darstellt und die Codierung TRUE = 'zurückgesetzt' und FALSE = 'Zugelassen' beinhaltet. Nach der einfaktoriellen ANOVA ist nach dem p-Wert die Nullhypothese beizubehalten. Das heißt, es gibt einen signifikanten Unterschied zwischen den zwei Gruppen, ceteris paribus. 
 
 ## Hypothese 7
 **[Das Verbergen der Internetprotokoll-Adresse und folglich der ortsspezifischen Parameter mittels Virtual Private Network verursacht eine Differenz im offerierten Preis einer Airline.]**
@@ -396,21 +433,32 @@ Zunächst gibt es wieder eine große Ungleichheit zwischen den erfassten Cookie-
 # filter data
 df6 <- df %>% 
   filter(Device == 3 & Datenzugriff == 1 & Cookies == TRUE) %>% 
-  select(Preis, IP_Adresse)
-colnames(df6)[2]<-"IP_Adresse_hidden"
+  select(Preis, IP_Adresse, Datum)
+
+
+
+#Join equal dates:
+
+df6_1 <- df6 %>% dplyr::filter(IP_Adresse == TRUE)
+df6_3 <- df6 %>% dplyr::filter(IP_Adresse == FALSE)
+df6_date <- df6_1 %>% dplyr::inner_join(df6_3, by = 'Datum') %>% select(Datum) %>% unique()
+df6 <- df6 %>% dplyr::filter(Datum %in% df6_date$Datum)
+
+df6$IP_Adresse <- factor(df6$IP_Adresse)
+levels(df6$IP_Adresse) <- c('Sichtbar', 'Verborgen')
 ````
 
 ### Deskreptive Statistik:
 ````{r DStat_H6}
 # Deskreptive Statistik:
-jmv::descriptives(df6, vars = c("Preis", "IP_Adresse_hidden"), sd = TRUE, missing = TRUE, freq = TRUE)
+jmv::descriptives(df6, vars = c("Preis", "IP_Adresse"), sd = TRUE, missing = TRUE, freq = TRUE)
 ````
 
 ### Verteilung - BoxPlot
 ```{r boxplot_H6, fig.width=10, fig.height=7}
 # Plot Box_Plot
-ggplot(df6, aes(IP_Adresse_hidden, Preis)) +
-  geom_boxplot(aes(fill = IP_Adresse_hidden), show.legend = TRUE) +
+ggplot(df6, aes(IP_Adresse, Preis)) +
+  geom_boxplot(aes(fill = IP_Adresse), show.legend = TRUE) +
   geom_point()
 ```
 
@@ -421,19 +469,14 @@ ggplot(df6, aes(IP_Adresse_hidden, Preis)) +
 
 Anova5<-jmv::ANOVA(data = df6, 
                    dep = "Preis",
-                   factors = c("IP_Adresse_hidden"),
-                   modelTerms = list("IP_Adresse_hidden"),
+                   factors = c("IP_Adresse"),
+                   modelTerms = list("IP_Adresse"),
                    effectSize = "partEta",
-                   emMeans = list("IP_Adresse_hidden"
+                   emMeans = list("IP_Adresse"
                    ),
                    emmTables = TRUE)
 Anova5
 ```
-
-### Interpretation - H7
-
-Es gibt eine Ungleichheit zwischen den erfassten IP-Adressen-Daten. Zu beachten ist, dass die Variable IP_Adresse_hidden eine binäre Variable darstellt und die Codierung TRUE = 'verborgen' und FALSE = 'sichtbar' beinhaltet. Nach der einfaktoriellen ANOVA ist nach dem p-Wert die Nullhypothese beizubehalten. Das heißt, es gibt keinen signifikanten Unterschied im Mittelwert der zwei Gruppen. Bei Betrachtung des Emm ist ersichtlich, dass das **Verbergen** der Cookies mit einem vermutlich höheren mittleren Preis verbunden ist.
-
 
 ## Hypothese 8
 **[Das Abrufen eines Flugpreises via Reise-Website führt, verglichen mit der Website der Airline selbst, zu einem höheren offerierten Preis.]**
@@ -442,12 +485,45 @@ Es gibt eine Ungleichheit zwischen den erfassten IP-Adressen-Daten. Zu beachten 
 #filter data frame: Website, Application
 df7 <- df %>% 
   filter(Device == 3 & Cookies == TRUE & IP_Adresse == FALSE) %>% 
-  select(Preis, Datenzugriff) 
+  select(Preis, Datenzugriff, Datum, Zeit) %>% 
+  unite(DatumZeit, c("Datum", "Zeit"), sep = "")
+
+
+
+
+# filter data
+df7.1 <- df %>%
+  filter(Datenzugriff == 1 & IP_Adresse == FALSE & Device == 3 & Cookies == TRUE) %>% 
+  select(Preis, Cookies, Datum, Zeit) %>% 
+  unite(DatumZeit, c("Datum", "Zeit"), sep = "")
+
+df7.2 <- df %>%
+  filter(Datenzugriff == 2 & IP_Adresse == FALSE & Device == 3 & Cookies == TRUE) %>% 
+  select(Preis, Cookies, Datum, Zeit)%>% 
+  unite(DatumZeit, c("Datum", "Zeit"), sep = "")
+
+
+#colnames(df5.1)[2]<-"Cookies_reset"
+#colnames(df5.2)[2]<-"Cookies_reset"
+
+
+#Join equal dates:
+
+df7_1 <- df7.1
+df7_3 <- df7.2
+df7_date <- df7_1 %>% dplyr::inner_join(df7_3, by = 'DatumZeit') %>% select(DatumZeit) %>% unique()
+df7 <- df7 %>% dplyr::filter(DatumZeit %in% df7_date$DatumZeit)
+
+
 # Change factor levels:
 df7$Datenzugriff<-as.numeric(df7$Datenzugriff)
 df7$Datenzugriff <- df7$Datenzugriff - 1
 df7 <- df7 %>% filter(Datenzugriff %in% c(1,2))
 df7$Datenzugriff <- as.factor(df7$Datenzugriff)
+
+
+levels(df7$Datenzugriff) <- c('Website', 'Reise-Website')
+
 ```
 
 ### Deskreptive Statistik:
@@ -479,10 +555,6 @@ Anova7<-jmv::ANOVA(data = df7,
                    emmTables = TRUE)
 Anova7
 ```
-
-### Interpretation - H8
-
-Die Unterschiede sind nicht signfikant. Das heißt, die Nullhypothese wird beibehalten. Es konnte nicht nachgewiesen werden, dass es unterschiedliche Preise für **Website (1)** und **Reise-Website (2)** gibt. Zudem gibt es Disbalancen zwischen den Sample-Größen der Merkmale.
 
 
 
