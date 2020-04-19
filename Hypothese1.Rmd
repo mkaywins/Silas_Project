@@ -38,6 +38,8 @@ df <- df %>% mutate_at(c("Flughafen", "Airline", "Zeit", "Device", "Datenzugriff
 
 df <- df %>% rename(Preis = `Preis (€)`) %>% rename(IP_Adresse = `IP-Adresse`)
 
+levels(df$Flughafen) <- c('Amsterdam', 'Berlin', 'Lissabon', 'London', 'Bangkok', 'New York', 'Tokio')
+levels(df$Airline) <- c('AUA', 'KLM', 'EZY', 'LDM', 'BAW', 'THA', 'UAL', 'ANA')
 
 ```
 
@@ -56,7 +58,7 @@ df1 <- df %>% mutate(Datum = weekdays(Datum)) %>% mutate(Datum = factor(Datum, l
                                                                                           "Samstag",
                                                                                           "Sonntag"))) %>%
   filter(Device == 0 & Datenzugriff == 0 & Cookies == FALSE & IP_Adresse == FALSE) %>% 
-  unite(Flughafen_Airline, c("Flughafen", "Airline"), sep = "") %>% 
+  unite(Flughafen_Airline, c("Flughafen", "Airline"), sep = "-") %>% 
   select(Flughafen_Airline,Preis, Datum, Zeit) 
 # rename levels für Zeit
 levels(df1$Zeit) <- c("Morgen", "Mittag", "Abend")
@@ -99,7 +101,7 @@ for (flug in unique(df1$Flughafen_Airline)){
 
 ````
 
-
+## ANOVA
 ````{r, fig.width=15, fig.height=7}
 temp <- c()
 for (flug in unique(df1$Flughafen_Airline)){

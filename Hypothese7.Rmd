@@ -1,0 +1,153 @@
+---
+title: "Hypothese7"
+author: "Silas Nöttling"
+date: "19 4 2020"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+```{r libs, include=FALSE}
+library(ggplot2)
+library(tidyverse)
+library(dplyr)
+library(stats)
+library(xts)
+library(data.table)
+library(forecast)
+library(stats)
+library(lmtest)
+```
+
+```{r setwd, include=FALSE}
+setwd("C:/Users/maxku/OneDrive/Documents/Silas/Silas_Project")
+```
+
+```{r readxlsx}
+# read-in excel data
+df <- readxl::read_excel("Data_Is_Key.xlsx")
+```
+
+```{r datawrangling, include=FALSE}
+# rename and convert Data
+df <- df %>% rename(Datum = `Datum (jjmmtt)`) %>% mutate(Datum = as.Date(Datum, format = "%y%m%d"))
+
+df <- df %>% mutate_at(c("Flughafen", "Airline", "Zeit", "Device", "Datenzugriff"), as.factor) %>% 
+  mutate_at(c("Cookies", "IP-Adresse"), as.logical)
+
+df <- df %>% rename(Preis = `Preis (€)`) %>% rename(IP_Adresse = `IP-Adresse`)
+
+levels(df$Flughafen) <- c('Amsterdam', 'Berlin', 'Lissabon', 'London', 'Bangkok', 'New York', 'Tokio')
+levels(df$Airline) <- c('AUA', 'KLM', 'EZY', 'LDM', 'BAW', 'THA', 'UAL', 'ANA')
+```
+
+```{r data_H7}
+#filter data frame: Website, Application
+df7 <- df %>% 
+  filter(Device == 3 & Cookies == TRUE & IP_Adresse == FALSE) %>% 
+  unite(Flughafen_Airline, c("Flughafen", "Airline"), sep = "-") %>% 
+  select(Preis, Datenzugriff, Datum, Zeit, Flughafen_Airline) %>% 
+  unite(DatumZeit, c("Datum", "Zeit"), sep = "")
+
+
+
+
+# filter data
+df7.1 <- df %>%
+  filter(Datenzugriff == 1 & IP_Adresse == FALSE & Device == 3 & Cookies == TRUE) %>% 
+  select(Preis, Cookies, Datum, Zeit) %>% 
+  unite(DatumZeit, c("Datum", "Zeit"), sep = "")
+
+df7.2 <- df %>%
+  filter(Datenzugriff == 2 & IP_Adresse == FALSE & Device == 3 & Cookies == TRUE) %>% 
+  select(Preis, Cookies, Datum, Zeit)%>% 
+  unite(DatumZeit, c("Datum", "Zeit"), sep = "")
+
+
+#colnames(df5.1)[2]<-"Cookies_reset"
+#colnames(df5.2)[2]<-"Cookies_reset"
+
+
+#Join equal dates:
+
+df7_1 <- df7.1
+df7_3 <- df7.2
+df7_date <- df7_1 %>% dplyr::inner_join(df7_3, by = 'DatumZeit') %>% select(DatumZeit) %>% unique()
+df7 <- df7 %>% dplyr::filter(DatumZeit %in% df7_date$DatumZeit)
+
+
+# Change factor levels:
+df7$Datenzugriff<-as.numeric(df7$Datenzugriff)
+df7$Datenzugriff <- df7$Datenzugriff - 1
+df7 <- df7 %>% filter(Datenzugriff %in% c(1,2))
+df7$Datenzugriff <- as.factor(df7$Datenzugriff)
+
+
+levels(df7$Datenzugriff) <- c('Website', 'Reise-Website')
+
+```
+
+
+
+## Deskriptive Statistik - Einzelflüge
+````{r}
+temp <- c()
+for (flug in unique(df7$Flughafen_Airline)){
+  
+  #filter flug
+  df7_single <- df7 %>% dplyr::filter(Flughafen_Airline == flug)
+  
+  # Deskreptive Statistik:
+    temp <- c(temp, jmv::descriptives(df7, vars = c("Preis", "Datenzugriff"), sd = TRUE, missing = TRUE, freq = TRUE))
+
+  
+}
+names(temp) <- paste('Flug:', unique(df7$Flughafen_Airline))
+temp
+````
+
+## Box-Plot - Einzelflüge
+````{r, fig.width=15, fig.height=7}
+
+for (flug in unique(df7$Flughafen_Airline)){
+  df7_single <- df7 %>% dplyr::filter(Flughafen_Airline == flug)
+  
+  # Plot Box_Plot
+  gp<-ggplot(df7, aes(Datenzugriff, Preis)) +
+  geom_boxplot(aes(fill = Datenzugriff), show.legend = TRUE) +
+  geom_point() +
+  ggtitle(paste('Flug:', flug))
+  
+  print(gp)
+
+}
+
+````
+
+
+## ANOVA
+````{r, fig.width=15, fig.height=7}
+temp <- c()
+for (flug in unique(df7$Flughafen_Airline)){
+  df7_single <- df7 %>% dplyr::filter(Flughafen_Airline == flug)
+  
+  # Mehrfakorielle ANOVA:
+Anova7<-jmv::ANOVA(data = df7, 
+                   dep = "Preis",
+                   factors = c("Datenzugriff"),
+                   modelTerms = list("Datenzugriff"),
+                   effectSize = "partEta",
+                   emMeans = list("Datenzugriff"
+                   ),
+                   emmTables = TRUE,
+                   emmPlots = FALSE)
+Anova7
+  temp <- c(temp, Anova7)
+}
+names(temp) <- paste('Flug:', unique(df7$Flughafen_Airline))
+temp
+````
+
+

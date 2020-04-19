@@ -1,10 +1,8 @@
 ---
-title: "Hypothese 3"
-author: "Silas Nöttling & Maximilian Kuttner"
-date: "14 4 2020"
-output:
-  pdf_document: default
-  html_document: default
+title: "Hypothese4"
+author: "Silas Nöttling"
+date: "19 4 2020"
+output: pdf_document
 ---
 
 ```{r setup, include=FALSE}
@@ -45,49 +43,58 @@ levels(df$Airline) <- c('AUA', 'KLM', 'EZY', 'LDM', 'BAW', 'THA', 'UAL', 'ANA')
 
 ```
 
+
 ````{r}
-#filter data frame
-df3 <- df %>%
-  filter(Datenzugriff == 0 & Cookies == TRUE & IP_Adresse == FALSE) %>% 
+#filter data frame: Website, Application
+df4 <- df %>%
+  filter(Datenzugriff %in% c(0,1) & Cookies == TRUE & IP_Adresse == FALSE) %>% 
   unite(Flughafen_Airline, c("Flughafen", "Airline"), sep = "-") %>% 
-  select(Preis, Device, Datum, Flughafen_Airline)
+  select(Datum, Preis, Device, Flughafen_Airline) 
+
 
 # Change factor levels:
-df3$Device<-as.numeric(df3$Device)
-df3$Device <- df3$Device - 1
-df3 <- df3 %>% filter(Device %in% c(1,2))
-df3$Device <- as.factor(df3$Device)
+df4$Device<-as.numeric(df4$Device)
+df4$Device <- df4$Device - 1
+df4 <- df4 %>% filter(Device %in% c(1,3))
+df4$Device <- as.factor(df4$Device)
 
-levels(df3$Device) <- c("Website", "Reise-Website")
+#Join equal dates:
+
+df4_1 <- df4 %>% dplyr::filter(Device == 1)
+df4_3 <- df4 %>% dplyr::filter(Device == 3)
+df4_date <- df4_1 %>% dplyr::inner_join(df4_3, by = 'Datum') %>% select(Datum) %>% unique()
+df4 <- df4 %>% dplyr::filter(Datum %in% df4_date$Datum)
+
+levels(df4$Device) <- c('Apple Ipad', 'Mac Book')
 ````
-
-
 
 ## Deskriptive Statistik - Einzelflüge
 ````{r}
 temp <- c()
-for (flug in unique(df3$Flughafen_Airline)){
-  df3_single <- df3 %>% dplyr::filter(Flughafen_Airline == flug)
+for (flug in unique(df4$Flughafen_Airline)){
+  
+  #filter flug
+  df4_single <- df4 %>% dplyr::filter(Flughafen_Airline == flug)
+  
   # Deskreptive Statistik:
-    temp <- c(temp, jmv::descriptives(df3_single, vars = c("Preis", "Device"), sd = TRUE, missing = TRUE, freq = TRUE))
+    temp <- c(temp, jmv::descriptives(df4, vars = c("Preis", "Device"), sd = TRUE, missing = TRUE, freq = TRUE))
 
   
 }
-names(temp) <- paste('Flug:', unique(df3$Flughafen_Airline))
+names(temp) <- paste('Flug:', unique(df4$Flughafen_Airline))
 temp
 ````
-
 
 ## Box-Plot - Einzelflüge
 ````{r, fig.width=15, fig.height=7}
 
-for (flug in unique(df3$Flughafen_Airline)){
-  df3_single <- df3 %>% dplyr::filter(Flughafen_Airline == flug)
+for (flug in unique(df4$Flughafen_Airline)){
+  df4_single <- df4 %>% dplyr::filter(Flughafen_Airline == flug)
   
   # Plot Box_Plot
-  gp<-ggplot(df3_single, aes(Device, Preis)) +
-    geom_boxplot(aes(fill = Device), show.legend = TRUE) +
-    geom_point() +
+  gp<-ggplot(df4, aes(Device, Preis)) +
+  geom_boxplot(aes(fill = Device), show.legend = TRUE) +
+  geom_point() +
     ggtitle(paste('Flug:', flug))
   
   print(gp)
@@ -96,23 +103,26 @@ for (flug in unique(df3$Flughafen_Airline)){
 
 ````
 
+
 ## ANOVA
 ````{r, fig.width=15, fig.height=7}
 temp <- c()
-for (flug in unique(df3$Flughafen_Airline)){
-  df3_single <- df3 %>% dplyr::filter(Flughafen_Airline == flug)
+for (flug in unique(df4$Flughafen_Airline)){
+  df4_single <- df4 %>% dplyr::filter(Flughafen_Airline == flug)
   
   # Mehrfakorielle ANOVA:
-  
-  Anova3<-jmv::ANOVA(data = df3_single, 
+Anova4<-jmv::ANOVA(data = df4, 
                    dep = "Preis",
                    factors = c("Device"),
+                   modelTerms = list("Device"),
+                   effectSize = "partEta",
                    emMeans = list("Device"
                    ),
                    emmTables = TRUE,
                    emmPlots = FALSE)
-  temp <- c(temp, Anova3)
+Anova4
+  temp <- c(temp, Anova4)
 }
-names(temp) <- paste('Flug:', unique(df3$Flughafen_Airline))
+names(temp) <- paste('Flug:', unique(df4$Flughafen_Airline))
 temp
 ````

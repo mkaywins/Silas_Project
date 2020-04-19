@@ -1,0 +1,125 @@
+---
+title: "Hypothese6"
+author: "Silas Nöttling"
+date: "19 4 2020"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+```{r libs, include=FALSE}
+library(ggplot2)
+library(tidyverse)
+library(dplyr)
+library(stats)
+library(xts)
+library(data.table)
+library(forecast)
+library(stats)
+library(lmtest)
+```
+
+```{r setwd, include=FALSE}
+setwd("C:/Users/maxku/OneDrive/Documents/Silas/Silas_Project")
+```
+
+```{r readxlsx}
+# read-in excel data
+df <- readxl::read_excel("Data_Is_Key.xlsx")
+```
+
+```{r datawrangling, include=FALSE}
+# rename and convert Data
+df <- df %>% rename(Datum = `Datum (jjmmtt)`) %>% mutate(Datum = as.Date(Datum, format = "%y%m%d"))
+
+df <- df %>% mutate_at(c("Flughafen", "Airline", "Zeit", "Device", "Datenzugriff"), as.factor) %>% 
+  mutate_at(c("Cookies", "IP-Adresse"), as.logical)
+
+df <- df %>% rename(Preis = `Preis (€)`) %>% rename(IP_Adresse = `IP-Adresse`)
+
+levels(df$Flughafen) <- c('Amsterdam', 'Berlin', 'Lissabon', 'London', 'Bangkok', 'New York', 'Tokio')
+levels(df$Airline) <- c('AUA', 'KLM', 'EZY', 'LDM', 'BAW', 'THA', 'UAL', 'ANA')
+```
+
+````{r data_H6}
+# filter data
+df6 <- df %>% 
+  filter(Device == 3 & Datenzugriff == 1 & Cookies == TRUE) %>% 
+  unite(Flughafen_Airline, c("Flughafen", "Airline"), sep = "-") %>% 
+  select(Preis, IP_Adresse, Datum, Flughafen_Airline)
+
+
+
+#Join equal dates:
+
+df6_1 <- df6 %>% dplyr::filter(IP_Adresse == TRUE)
+df6_3 <- df6 %>% dplyr::filter(IP_Adresse == FALSE)
+df6_date <- df6_1 %>% dplyr::inner_join(df6_3, by = 'Datum') %>% select(Datum) %>% unique()
+df6 <- df6 %>% dplyr::filter(Datum %in% df6_date$Datum)
+
+df6$IP_Adresse <- factor(df6$IP_Adresse)
+levels(df6$IP_Adresse) <- c('Sichtbar', 'Verborgen')
+````
+
+## Deskriptive Statistik - Einzelflüge
+````{r}
+temp <- c()
+for (flug in unique(df6$Flughafen_Airline)){
+  
+  #filter flug
+  df6_single <- df6 %>% dplyr::filter(Flughafen_Airline == flug)
+  
+  # Deskreptive Statistik:
+    temp <- c(temp, jmv::descriptives(df6, vars = c("Preis", "IP_Adresse"), sd = TRUE, missing = TRUE, freq = TRUE))
+
+  
+}
+names(temp) <- paste('Flug:', unique(df6$Flughafen_Airline))
+temp
+````
+
+## Box-Plot - Einzelflüge
+````{r, fig.width=15, fig.height=7}
+
+for (flug in unique(df6$Flughafen_Airline)){
+  df6_single <- df6 %>% dplyr::filter(Flughafen_Airline == flug)
+  
+  # Plot Box_Plot
+  gp<-ggplot(df6, aes(IP_Adresse, Preis)) +
+  geom_boxplot(aes(fill = IP_Adresse), show.legend = TRUE) +
+  geom_point() +
+  ggtitle(paste('Flug:', flug))
+  
+  print(gp)
+
+}
+
+````
+
+
+## ANOVA
+````{r, fig.width=15, fig.height=7}
+temp <- c()
+for (flug in unique(df6$Flughafen_Airline)){
+  df6_single <- df6 %>% dplyr::filter(Flughafen_Airline == flug)
+  
+  # Mehrfakorielle ANOVA:
+Anova6<-jmv::ANOVA(data = df6, 
+                   dep = "Preis",
+                   factors = c("IP_Adresse"),
+                   modelTerms = list("IP_Adresse"),
+                   effectSize = "partEta",
+                   emMeans = list("IP_Adresse"
+                   ),
+                   emmTables = TRUE,
+                   emmPlots = FALSE)
+Anova6
+  temp <- c(temp, Anova6)
+}
+names(temp) <- paste('Flug:', unique(df6$Flughafen_Airline))
+temp
+````
+
+
