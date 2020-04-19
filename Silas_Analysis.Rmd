@@ -168,6 +168,7 @@ ggplot() +
   scale_color_manual(name = "Lines", 
                      values = c("Data" = "black", "Fitted" = "red")) +
   ylab("Preis")+
+  xlab('Zeit')
   ggtitle('Zeitreihe - Flugpreise')
 ````
 
@@ -176,7 +177,7 @@ library(lubridate)
 # Plot 2: Forecast
 
 autoplot(fore) +
-  xlab("Datum") +
+  xlab("Zeit") +
   ylab("Preis") 
 
 ````
@@ -193,7 +194,10 @@ df_time <- df %>%
   unite(Flughafen_Airline, c("Flughafen", "Airline"), sep = "-")
 
 ggplot(data=df_time, aes(x=Datum, y=mean_Preis)) +
-  geom_line(aes(group = Flughafen_Airline, colour = Flughafen_Airline )) 
+  geom_line(aes(group = Flughafen_Airline, colour = Flughafen_Airline )) +
+  ylab('Preis in €') +
+  xlab('Zeit')
+  ggtitle('Preis im Zeitverlauf - alle Flüge')
 ````
 
 
@@ -225,15 +229,15 @@ for (flug in unique(df_time$Flughafen_Airline)){
   
 
     gplot <- autoplot(fore) +
-    xlab("Datum") +
-    ylab("Preis") +
+    xlab("Zeit") +
+    ylab("Preis in €") +
     ggplot2::ggtitle(paste('Forecast - Flug:', flug, '/ Model:', fore$method, sep = ' '))
     
     print(gplot)
 }
 ````
 
-````{r, fig.width=15, fig.height=7, warning = FALSE}
+````{r, fig.width=15, fig.height=7, warning = FALSE, message = FALSE}
 df_time_rel <- df %>%
   filter(Device == 0 & Datenzugriff == 0 & Cookies == FALSE & IP_Adresse == FALSE) %>% 
   select(Flughafen, Airline, Datum, Preis) %>% 
@@ -243,15 +247,41 @@ df_time_rel <- df %>%
   dplyr::summarise(mean_Preis = mean(Preis)) %>% 
   unite(Flughafen_Airline, c("Flughafen", "Airline"), sep = "-")
 
-df_time_rel<-do.call(rbind, by(df_time_rel, df_time_rel$Flughafen_Airline, function(x)
-  if (anyNA(x$mean_Preis)) return(cbind(x, output=NA))
-  else return (cbind(x, output=c(1, 1/x$mean_Preis[-length(x$mean_Preis)]*c(x$mean_Preis[-1]))))))
+
+df_time_rel<-readxl::read_excel('relchange.xlsx')
+df_time_rel <- df_time_rel[, c(2,3,4,5)]
+colnames(df_time_rel)[4] <- 'relative_change'
+#df_time_rel<-do.call(rbind, by(df_time_rel, df_time_rel$Flughafen_Airline, function(x)
+#  if (anyNA(x$mean_Preis)) return(cbind(x, output=NA))
+#  else return (cbind(x, output=c(1, 1/x$mean_Preis[-length(x$mean_Preis)]*c(x$mean_Preis[-1]))))))
 
 
-ggplot(data=df_time_rel, aes(x=Datum, y=output)) +
+ggplot(data=df_time_rel, aes(x=Datum, y=relative_change)) +
   geom_line(aes(group = Flughafen_Airline, colour = Flughafen_Airline )) +
-  ggtitle('Relative Veränderung - Flugpreise pro Flug')
+  ggtitle('Relative Veränderung - Flugpreise pro Flug') +
+  ylab('relative Veränderung') +
+  xlab('Zeit')
 ````
+````{r, fig.width=15, fig.height=7, warning = FALSE}
+df_time_rel2 <- df_time_rel %>% group_by(Datum) %>% summarise(mean_rel = mean(relative_change))
+# Plot 1
+ggplot() +
+  geom_line(data = df_time_rel2, aes(x = Datum, y = mean_rel * 100)) +
+  ylab('mittlere Veränderungsrate (Preis) in Prozent') +
+  xlab('Zeit') +
+  ggtitle('Mittlere Veränderungsrate aller Flugpreise im Zeitverlauf')
+````
+### BoxPlot Vergleich aller Flüge
+
+```{r boxplot_EXTRA, fig.width=15, fig.height=7}
+# Plot Box_Plot
+ggplot(df_time_rel, aes(Flughafen_Airline, mean_Preis)) +
+  geom_boxplot(aes(fill = Flughafen_Airline), show.legend = TRUE) +
+  geom_point() +
+  ylab('Preis in €') +
+  xlab('Flughafen-Airline') +
+  ggtitle('Box-Plot: Verteilung - alle Flüge')
+```
 
 ## Hypothese 3
 **[Die Wahl des Betriebssystems respektive die Marke des Nutzerendgeräts mit dem die Reise-Website abgerufen wird, hat eine Auswirkung auf den offerierten Preis einer Airline.]**
