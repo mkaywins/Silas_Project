@@ -2,7 +2,9 @@
 title: "Hypothese 1"
 author: "Silas Nöttling & Maximilian Kuttner"
 date: "12 4 2020"
-output: pdf_document
+output:
+  html_document:
+    df_print: paged
 ---
 
 ```{r setup, include=FALSE}
@@ -86,7 +88,7 @@ temp
 for (flug in unique(df1$Flughafen_Airline)){
   df1_single <- df1 %>% dplyr::filter(Flughafen_Airline == flug)
   
-  jmv::descriptives(df1_single, vars = c("Preis", "Datum", "Zeit"), sd = TRUE, missing = TRUE, freq = TRUE)
+  jmv::descriptives(df1_single, vars = c("Preis", "Datum", "Zeit"), sd = TRUE, missing = TRUE, freq = F)
 
   # Plot Box_Plot
   gp<-ggplot(df1_single, aes(Datum, Preis)) +

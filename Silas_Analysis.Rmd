@@ -3,13 +3,13 @@ title: "Silas_Analysis"
 author: "Max Kuttner"
 date: "25 3 2020"
 output:
-  pdf_document: default
-  word_document: default
   html_document: default
+  word_document: default
+  pdf_document: default
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = FALSE)
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE)
 ```
 
 ```{r libs, include=FALSE}
@@ -17,6 +17,7 @@ library(ggplot2)
 library(tidyverse)
 library(dplyr)
 library(stats)
+library(lubridate)
 library(xts)
 library(data.table)
 library(forecast)
@@ -35,7 +36,7 @@ df <- readxl::read_excel("Data_Is_Key.xlsx")
 
 ```{r datawrangling, include=FALSE}
 # rename and convert Data
-df <- df %>% rename(Datum = `Datum (jjmmtt)`) %>% mutate(Datum = as.Date(Datum, format = "%y%m%d"))
+df <- df %>% rename(Wochentag = `Datum (jjmmtt)`) %>% mutate(Wochentag = as.Date(Wochentag, format = "%y%m%d"))
 
 df <- df %>% mutate_at(c("Flughafen", "Airline", "Zeit", "Device", "Datenzugriff"), as.factor) %>% 
   mutate_at(c("Cookies", "IP-Adresse"), as.logical)
@@ -44,6 +45,10 @@ df <- df %>% rename(Preis = `Preis (€)`) %>% rename(IP_Adresse = `IP-Adresse`)
 
 levels(df$Flughafen) <- c('Amsterdam', 'Berlin', 'Lissabon', 'London', 'Bangkok', 'New York', 'Tokio')
 levels(df$Airline) <- c('AUA', 'KLM', 'EZY', 'LDM', 'BAW', 'THA', 'UAL', 'ANA')
+
+
+df_ersterPreis <-df %>% unite(Flughafen_Airline, c("Flughafen", "Airline"), sep = "-") 
+
 ```
 
 ## Hypothese 1
@@ -51,11 +56,11 @@ levels(df$Airline) <- c('AUA', 'KLM', 'EZY', 'LDM', 'BAW', 'THA', 'UAL', 'ANA')
 
 ```{r data_H1, echo=FALSE}
 # 1)
-# Modell 1: Preis in Abhängigkeit von Zeit und Datum
+# Modell 1: Preis in Abhängigkeit von Zeit und Wochentag
 
-# Dazu müssen wir zuerst Datum nach Mo, Di, Mi, ... kategorisieren
+# Dazu müssen wir zuerst Wochentag nach Mo, Di, Mi, ... kategorisieren
 
-df1 <- df %>% mutate(Datum = weekdays(Datum)) %>% mutate(Datum = factor(Datum, levels = c("Montag",
+df1 <- df %>% mutate(Wochentag = weekdays(Wochentag)) %>% mutate(Wochentag = factor(Wochentag, levels = c("Montag",
                                                                                           "Dienstag",
                                                                                           "Mittwoch",
                                                                                           "Donnerstag",
@@ -63,26 +68,31 @@ df1 <- df %>% mutate(Datum = weekdays(Datum)) %>% mutate(Datum = factor(Datum, l
                                                                                           "Samstag",
                                                                                           "Sonntag"))) %>%
   filter(Device == 0 & Datenzugriff == 0 & Cookies == FALSE & IP_Adresse == FALSE) %>% 
-  unite(Flughafen_Airline, c("Flughafen", "Airline"), sep = "") %>% 
-  select(Flughafen_Airline,Preis, Datum, Zeit) 
+  unite(Flughafen_Airline, c("Flughafen", "Airline"), sep = "-") %>% 
+  select(Flughafen_Airline,Preis, Wochentag, Zeit) 
 
 levels(df1$Zeit) <- c("Morgen", "Mittag", "Abend")
-#levels(df1$Datum)
+#levels(df1$Wochentag)
 #str(df)
+
+df1_rel <- df_ersterPreis %>% group_by(Flughafen_Airline) %>% arrange(Wochentag) %>% filter(row_number()==1) %>% mutate(ersterPreis = Preis) %>%  select(Flughafen_Airline,ersterPreis) 
+df1 <- df1 %>% left_join(df1_rel, by='Flughafen_Airline') %>% mutate(Preis = Preis/ersterPreis) %>% select(-ersterPreis)
+
 ```
 
 ### Deskreptive Statistik:
 
 ```{r DStat_H1, echo=FALSE}
-jmv::descriptives(df1, vars = c("Preis", "Datum", "Zeit"), sd = TRUE, missing = TRUE, freq = TRUE)
+jmv::descriptives(df1, vars = c("Preis", "Wochentag", "Zeit"), sd = TRUE, missing = TRUE, freq = TRUE)
 ```
 
 ### Verteilung - BoxPlot
 ```{r boxplot_H1, fig.width=15, fig.height=7}
 # Plot Box_Plot
-ggplot(df1, aes(Datum, Preis)) +
-  geom_boxplot(aes(fill = Datum), show.legend = TRUE) +
+ggplot(df1, aes(Wochentag, Preis)) +
+  geom_boxplot(aes(fill = Wochentag), show.legend = TRUE) +
   geom_point() +
+  xlab('Wochentag') +
   facet_wrap(~Zeit)
 ```
 
@@ -93,11 +103,11 @@ ggplot(df1, aes(Datum, Preis)) +
 
 Anova1<-jmv::ANOVA(data = df1, 
            dep = "Preis",
-           factors = c("Datum", "Zeit"),
-           modelTerms = list("Datum", "Zeit"),
+           factors = c("Wochentag", "Zeit"),
+           modelTerms = list("Wochentag", "Zeit"),
            effectSize = "partEta",
            emMeans = list(
-             c("Datum", "Zeit")
+             c("Wochentag", "Zeit")
            ),
            emmTables = TRUE
            )
@@ -124,27 +134,33 @@ Emm1 %>% arrange(mean)
 **[Je spontaner und kurzfristiger die Kaufentscheidung getroffen wird, desto höher ist der offerierte Preis einer Airline.]**
 
 ````{r data_H2}
-# Für alle Flüge pro Datum
+# Für alle Flüge pro Wochentag
 df_time <- df %>% 
   filter(Device == 0 & Datenzugriff == 0 & Cookies == FALSE & IP_Adresse == FALSE)%>%
-  select(Datum, Preis) %>% 
-  group_by(Datum) %>%
+  select(Wochentag, Preis) %>% 
+  group_by(Wochentag) %>%
   dplyr::summarise(mean_Preis = mean(Preis))
 
-#create time series
+#create time series with relative prices
+df_time_rel<-readxl::read_excel('relchange.xlsx')
+df_time_rel <- df_time_rel[, c(2,3,4,5,6)]
+colnames(df_time_rel)[4] <- 'relative_change'
+
+df_time_rel <- df_time_rel %>%  group_by(Wochentag) %>%
+  dplyr::summarise(mean_Preis = mean(rel_t0)) %>% select(Wochentag, mean_Preis)
 
 ## Create a daily Date object - helps my work on dates
 inds <- seq(as.Date("2019-08-01"), as.Date("2020-01-19"), by = "day")
 inds <- as.POSIXlt(inds)
 
 ## Create a time series object
-myts <- ts(df_time[,2],     # Preis-data
+myts <- ts(df_time_rel$mean_Preis,     # Preis-data
            start = c(2019, as.numeric(format(inds[1], "%j"))),
            frequency = 365)
 
 fit <- auto.arima(myts)
 
-df_time_fity<- cbind(df_time, as.numeric(fit$fitted))
+df_time_fity<- cbind(df_time_rel, as.numeric(fit$fitted))
 colnames(df_time_fity)[3]<- "fitted"
 
 # create forecast:
@@ -152,29 +168,31 @@ colnames(df_time_fity)[3]<- "fitted"
 fore <- forecast(fit, h = 13)
 ````
 
-**Diese Zeitreihe lässt sich mit einem ARIMA(2,2,1)-Modell modellieren.**
+**Diese Zeitreihe lässt sich mit folgendem Modell modellieren.**
 ````{r Arima_H2}
 summary(fit)
 # coefficient-test
 coeftest(fit)
 ````
+
 **Mit diesem Modell kann in weiterer Folge die Zeitrehe angenähert werden und bis zum 1.Februar 2020 vorhergesagt werden.**
 
 ````{r TSPlot1_H2, fig.width=15, fig.height=7}
 # Plot 1
 ggplot() +
-  geom_line(data = df_time_fity, aes(x = Datum, y = mean_Preis, color = "Data")) +
-  geom_line(data = df_time_fity, aes(x = Datum, y = fitted, color = "Fitted")) +
+  geom_line(data = df_time_fity, aes(x = Wochentag, y = mean_Preis, color = "Data")) +
+  geom_line(data = df_time_fity, aes(x = Wochentag, y = fitted, color = "Fitted")) +
   scale_color_manual(name = "Lines", 
                      values = c("Data" = "black", "Fitted" = "red")) +
-  ylab("Preis")+
-  xlab('Zeit')
+  ylab("Preis in Prozent zu t=0")+
+  xlab('Zeit') +
   ggtitle('Zeitreihe - Flugpreise')
 ````
 
-````{r ForecastPlot_H2, fig.width=15, fig.height=7}
-library(lubridate)
+````{r ForecastPlot_H2, fig.width=15, fig.height=7, warning = FALSE}
+
 # Plot 2: Forecast
+
 
 autoplot(fore) +
   xlab("Zeit") +
@@ -183,20 +201,20 @@ autoplot(fore) +
 ````
 
 ````{r TSPlot2_H2, fig.width=15, fig.height=7}
-# Für jeden Flug zu jedem Datum
+# Für jeden Flug zu jedem Wochentag
 df_time <- df %>%
   filter(Device == 0 & Datenzugriff == 0 & Cookies == FALSE & IP_Adresse == FALSE) %>% 
-  select(Flughafen, Airline, Datum, Preis) %>% 
+  select(Flughafen, Airline, Wochentag, Preis) %>% 
   mutate(Flughafen = as.character(Flughafen)) %>% 
   mutate(Airline = as.character(Airline)) %>% 
-  group_by(Flughafen, Airline, Datum) %>%
+  group_by(Flughafen, Airline, Wochentag) %>%
   dplyr::summarise(mean_Preis = mean(Preis)) %>% 
   unite(Flughafen_Airline, c("Flughafen", "Airline"), sep = "-")
 
-ggplot(data=df_time, aes(x=Datum, y=mean_Preis)) +
+ggplot(data=df_time, aes(x=Wochentag, y=mean_Preis)) +
   geom_line(aes(group = Flughafen_Airline, colour = Flughafen_Airline )) +
   ylab('Preis in €') +
-  xlab('Zeit')
+  xlab('Zeit') +
   ggtitle('Preis im Zeitverlauf - alle Flüge')
 ````
 
@@ -237,48 +255,71 @@ for (flug in unique(df_time$Flughafen_Airline)){
 }
 ````
 
+````{r plot_every_single_flug, fig.width=15, fig.height=7, warning = FALSE}
+
+
+for (flug in unique(df_time$Flughafen_Airline)){
+  df_time_single <- df_time %>% filter(Flughafen_Airline == flug)
+  
+  gp<-ggplot(data=df_time_single, aes(x=Wochentag, y=mean_Preis)) +
+    geom_line(aes(group = Flughafen_Airline )) +
+    ylab('Preis in €') +
+    xlab('Zeit') +
+    ggtitle(paste('Preis im Zeitverlauf - Flug:', flug))
+    
+  print(gp)
+}
+````
+
+### Relative Veränderung zu t=0
 ````{r, fig.width=15, fig.height=7, warning = FALSE, message = FALSE}
 df_time_rel <- df %>%
   filter(Device == 0 & Datenzugriff == 0 & Cookies == FALSE & IP_Adresse == FALSE) %>% 
-  select(Flughafen, Airline, Datum, Preis) %>% 
+  select(Flughafen, Airline, Wochentag, Preis) %>% 
   mutate(Flughafen = as.character(Flughafen)) %>% 
   mutate(Airline = as.character(Airline)) %>% 
-  group_by(Flughafen, Airline, Datum) %>% 
+  group_by(Flughafen, Airline, Wochentag) %>% 
   dplyr::summarise(mean_Preis = mean(Preis)) %>% 
   unite(Flughafen_Airline, c("Flughafen", "Airline"), sep = "-")
 
 
 df_time_rel<-readxl::read_excel('relchange.xlsx')
-df_time_rel <- df_time_rel[, c(2,3,4,5)]
+df_time_rel <- df_time_rel[, c(2,3,4,5,6)]
 colnames(df_time_rel)[4] <- 'relative_change'
 #df_time_rel<-do.call(rbind, by(df_time_rel, df_time_rel$Flughafen_Airline, function(x)
 #  if (anyNA(x$mean_Preis)) return(cbind(x, output=NA))
 #  else return (cbind(x, output=c(1, 1/x$mean_Preis[-length(x$mean_Preis)]*c(x$mean_Preis[-1]))))))
 
 
-ggplot(data=df_time_rel, aes(x=Datum, y=relative_change)) +
+ggplot(data=df_time_rel, aes(x=Wochentag, y=rel_t0)) +
   geom_line(aes(group = Flughafen_Airline, colour = Flughafen_Airline )) +
   ggtitle('Relative Veränderung - Flugpreise pro Flug') +
-  ylab('relative Veränderung') +
+  ylab('relative Veränderung zu t=0') +
   xlab('Zeit')
 ````
+
 ````{r, fig.width=15, fig.height=7, warning = FALSE}
-df_time_rel2 <- df_time_rel %>% group_by(Datum) %>% summarise(mean_rel = mean(relative_change))
+df_time_rel2 <- df_time_rel %>% group_by(Wochentag) %>% summarise(mean_rel = mean(relative_change))
 # Plot 1
 ggplot() +
-  geom_line(data = df_time_rel2, aes(x = Datum, y = mean_rel * 100)) +
+  geom_line(data = df_time_rel2, aes(x = Wochentag, y = mean_rel * 100)) +
   ylab('mittlere Veränderungsrate (Preis) in Prozent') +
   xlab('Zeit') +
   ggtitle('Mittlere Veränderungsrate aller Flugpreise im Zeitverlauf')
 ````
+
 ### BoxPlot Vergleich aller Flüge
 
 ```{r boxplot_EXTRA, fig.width=15, fig.height=7}
 # Plot Box_Plot
-ggplot(df_time_rel, aes(Flughafen_Airline, mean_Preis)) +
+
+temp_box<-df_time_rel
+temp_box$Flughafen_Airline <- factor(temp_box$Flughafen_Airline) 
+levels(temp_box$Flughafen_Airline)<-c('AMS-AUA', 'AMS-KLM', 'BAW-AUA', 'BAW-THA', 'BER-AUA', 'BER-EZY', 'LSB-AUA', 'LSB-LDM', 'LDN-AUA', 'LDN-BAW', 'NY-AUA', 'NY-UAL', 'TOK-ANA', 'TOK-AUA')
+ggplot(temp_box, aes(Flughafen_Airline, rel_t0)) +
   geom_boxplot(aes(fill = Flughafen_Airline), show.legend = TRUE) +
   geom_point() +
-  ylab('Preis in €') +
+  ylab('Preis im Verhältnis zu t=0') +
   xlab('Flughafen-Airline') +
   ggtitle('Box-Plot: Verteilung - alle Flüge')
 ```
@@ -290,7 +331,8 @@ ggplot(df_time_rel, aes(Flughafen_Airline, mean_Preis)) +
 #filter data frame
 df3 <- df %>%
   filter(Datenzugriff == 0 & Cookies == TRUE & IP_Adresse == FALSE) %>% 
-  select(Preis, Device, Datum)
+  unite(Flughafen_Airline, c("Flughafen", "Airline"), sep = "-") %>% 
+  select(Preis, Device, Wochentag, Flughafen_Airline)
 
 # Change factor levels:
 df3$Device<-as.numeric(df3$Device)
@@ -299,6 +341,11 @@ df3 <- df3 %>% filter(Device %in% c(1,2))
 df3$Device <- as.factor(df3$Device)
 
 levels(df3$Device) <- c("Website", "Reise-Website")
+
+
+df3 <- df3 %>% left_join(df1_rel, by='Flughafen_Airline') %>% mutate(Preis = Preis/ersterPreis) %>% select(-ersterPreis)
+
+
 ```
 
 ### Deskreptive Statistik:
@@ -336,7 +383,8 @@ Anova3
 #filter data frame: Website, Application
 df4 <- df %>%
   filter(Datenzugriff %in% c(0,1) & Cookies == TRUE & IP_Adresse == FALSE) %>% 
-  select(Datum, Preis, Device) 
+  unite(Flughafen_Airline, c("Flughafen", "Airline"), sep = "-") %>% 
+  select(Wochentag, Preis, Device, Flughafen_Airline) 
 
 
 # Change factor levels:
@@ -349,10 +397,13 @@ df4$Device <- as.factor(df4$Device)
 
 df4_1 <- df4 %>% dplyr::filter(Device == 1)
 df4_3 <- df4 %>% dplyr::filter(Device == 3)
-df4_date <- df4_1 %>% dplyr::inner_join(df4_3, by = 'Datum') %>% select(Datum) %>% unique()
-df4 <- df4 %>% dplyr::filter(Datum %in% df4_date$Datum)
+df4_date <- df4_1 %>% dplyr::inner_join(df4_3, by = 'Wochentag') %>% select(Wochentag) %>% unique()
+df4 <- df4 %>% dplyr::filter(Wochentag %in% df4_date$Wochentag)
 
 levels(df4$Device) <- c('Apple Ipad', 'Mac Book')
+
+df4 <- df4 %>% left_join(df1_rel, by='Flughafen_Airline') %>% mutate(Preis = Preis/ersterPreis) %>% select(-ersterPreis)
+
 ```
 
 ### Deskreptive Statistik:
@@ -394,21 +445,24 @@ Anova4
 # filter data
 df5 <- df %>%
   filter(Datenzugriff == 0 & IP_Adresse == FALSE & Device %in% c(0, 1)) %>% 
-  select(Preis, Cookies, Datum, Zeit) %>% 
-  unite(DatumZeit, c("Datum", "Zeit"), sep = "")
-#colnames(df5)[2]<-"Cookies_reset"
+  unite(Flughafen_Airline, c("Flughafen", "Airline"), sep = "-") %>% 
+  select(Preis, Cookies, Wochentag, Zeit,Flughafen_Airline) 
+  
+  
 
+df5 <- df5 %>% left_join(df1_rel, by='Flughafen_Airline') %>% mutate(Preis = Preis/ersterPreis) %>% select(-ersterPreis)
+df5 <- df5 %>% unite(WochentagZeit, c("Wochentag", "Zeit"), sep = "") 
 
 # filter data
 df5.1 <- df %>%
   filter(Datenzugriff == 0 & IP_Adresse == FALSE & Device == 0 & Cookies == FALSE) %>% 
-  select(Preis, Cookies, Datum, Zeit) %>% 
-  unite(DatumZeit, c("Datum", "Zeit"), sep = "")
+  select(Preis, Cookies, Wochentag, Zeit) %>% 
+  unite(WochentagZeit, c("Wochentag", "Zeit"), sep = "")
 
 df5.2 <- df %>%
   filter(Datenzugriff == 0 & IP_Adresse == FALSE & Device == 1 & Cookies == TRUE) %>% 
-  select(Preis, Cookies, Datum, Zeit)%>% 
-  unite(DatumZeit, c("Datum", "Zeit"), sep = "")
+  select(Preis, Cookies, Wochentag, Zeit)%>% 
+  unite(WochentagZeit, c("Wochentag", "Zeit"), sep = "")
 
 
 #colnames(df5.1)[2]<-"Cookies_reset"
@@ -419,11 +473,12 @@ df5.2 <- df %>%
 
 df5_1 <- df5.1
 df5_3 <- df5.2
-df5_date <- df5_1 %>% dplyr::inner_join(df5_3, by = 'DatumZeit') %>% select(DatumZeit) %>% unique()
-df5 <- df5 %>% dplyr::filter(DatumZeit %in% df5_date$DatumZeit)
+df5_date <- df5_1 %>% dplyr::inner_join(df5_3, by = 'WochentagZeit') %>% select(WochentagZeit) %>% unique()
+df5 <- df5 %>% dplyr::filter(WochentagZeit %in% df5_date$WochentagZeit)
 
 df5$Cookies <- factor(df5$Cookies)
 levels(df5$Cookies) <- c('Zugelassen', 'Zurueckgesetzt')
+
 ````
 
 ### Deskreptive Statistik:
@@ -463,16 +518,18 @@ Anova5
 # filter data
 df6 <- df %>% 
   filter(Device == 3 & Datenzugriff == 1 & Cookies == TRUE) %>% 
-  select(Preis, IP_Adresse, Datum)
+  unite(Flughafen_Airline, c("Flughafen", "Airline"), sep = "-") %>% 
+  select(Preis, IP_Adresse, Wochentag, Flughafen_Airline)
 
 
 
+df6 <- df6 %>% left_join(df1_rel, by='Flughafen_Airline') %>% mutate(Preis = Preis/ersterPreis) %>% select(-ersterPreis)
 #Join equal dates:
 
 df6_1 <- df6 %>% dplyr::filter(IP_Adresse == TRUE)
 df6_3 <- df6 %>% dplyr::filter(IP_Adresse == FALSE)
-df6_date <- df6_1 %>% dplyr::inner_join(df6_3, by = 'Datum') %>% select(Datum) %>% unique()
-df6 <- df6 %>% dplyr::filter(Datum %in% df6_date$Datum)
+df6_date <- df6_1 %>% dplyr::inner_join(df6_3, by = 'Wochentag') %>% select(Wochentag) %>% unique()
+df6 <- df6 %>% dplyr::filter(Wochentag %in% df6_date$Wochentag)
 
 df6$IP_Adresse <- factor(df6$IP_Adresse)
 levels(df6$IP_Adresse) <- c('Sichtbar', 'Verborgen')
@@ -515,8 +572,17 @@ Anova5
 #filter data frame: Website, Application
 df7 <- df %>% 
   filter(Device == 3 & Cookies == TRUE & IP_Adresse == FALSE) %>% 
-  select(Preis, Datenzugriff, Datum, Zeit) %>% 
-  unite(DatumZeit, c("Datum", "Zeit"), sep = "")
+  filter(Airline == 'AUA') %>% 
+  unite(Flughafen_Airline, c("Flughafen", "Airline"), sep = "-") %>% 
+  unite(WochentagZeit, c("Wochentag", "Zeit"), sep = "") %>% 
+  select(Preis, Datenzugriff, Flughafen_Airline, WochentagZeit)
+  
+  
+
+
+df7 <- df7 %>% left_join(df1_rel, by='Flughafen_Airline') %>% mutate(Preis = Preis/ersterPreis) %>% select(-ersterPreis)
+  
+#df7<- df7 %>%   unite(WochentagZeit, c("Wochentag", "Zeit"), sep = "")
 
 
 
@@ -524,13 +590,13 @@ df7 <- df %>%
 # filter data
 df7.1 <- df %>%
   filter(Datenzugriff == 1 & IP_Adresse == FALSE & Device == 3 & Cookies == TRUE) %>% 
-  select(Preis, Cookies, Datum, Zeit) %>% 
-  unite(DatumZeit, c("Datum", "Zeit"), sep = "")
+  select(Preis, Cookies, Wochentag, Zeit) %>% 
+  unite(WochentagZeit, c("Wochentag", "Zeit"), sep = "")
 
 df7.2 <- df %>%
   filter(Datenzugriff == 2 & IP_Adresse == FALSE & Device == 3 & Cookies == TRUE) %>% 
-  select(Preis, Cookies, Datum, Zeit)%>% 
-  unite(DatumZeit, c("Datum", "Zeit"), sep = "")
+  select(Preis, Cookies, Wochentag, Zeit)%>% 
+  unite(WochentagZeit, c("Wochentag", "Zeit"), sep = "")
 
 
 #colnames(df5.1)[2]<-"Cookies_reset"
@@ -541,8 +607,8 @@ df7.2 <- df %>%
 
 df7_1 <- df7.1
 df7_3 <- df7.2
-df7_date <- df7_1 %>% dplyr::inner_join(df7_3, by = 'DatumZeit') %>% select(DatumZeit) %>% unique()
-df7 <- df7 %>% dplyr::filter(DatumZeit %in% df7_date$DatumZeit)
+df7_date <- df7_1 %>% dplyr::inner_join(df7_3, by = 'WochentagZeit') %>% select(WochentagZeit) %>% unique()
+df7 <- df7 %>% dplyr::filter(WochentagZeit %in% df7_date$WochentagZeit)
 
 
 # Change factor levels:

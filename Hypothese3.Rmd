@@ -3,8 +3,8 @@ title: "Hypothese 3"
 author: "Silas Nöttling & Maximilian Kuttner"
 date: "14 4 2020"
 output:
-  pdf_document: default
   html_document: default
+  pdf_document: default
 ---
 
 ```{r setup, include=FALSE}
@@ -69,7 +69,7 @@ temp <- c()
 for (flug in unique(df3$Flughafen_Airline)){
   df3_single <- df3 %>% dplyr::filter(Flughafen_Airline == flug)
   # Deskreptive Statistik:
-    temp <- c(temp, jmv::descriptives(df3_single, vars = c("Preis", "Device"), sd = TRUE, missing = TRUE, freq = TRUE))
+    temp <- c(temp, jmv::descriptives(df3_single, vars = c("Preis", "Device"), sd = TRUE, missing = TRUE, freq = F))
 
   
 }

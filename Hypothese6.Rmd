@@ -1,8 +1,10 @@
 ---
-title: "Hypothese6"
+title: "Hypothese 7"
 author: "Silas Nöttling"
 date: "19 4 2020"
-output: pdf_document
+output:
+  html_document:
+    df_print: paged
 ---
 
 ```{r setup, include=FALSE}
@@ -72,7 +74,7 @@ for (flug in unique(df6$Flughafen_Airline)){
   df6_single <- df6 %>% dplyr::filter(Flughafen_Airline == flug)
   
   # Deskreptive Statistik:
-    temp <- c(temp, jmv::descriptives(df6, vars = c("Preis", "IP_Adresse"), sd = TRUE, missing = TRUE, freq = TRUE))
+    temp <- c(temp, jmv::descriptives(df6_single, vars = c("Preis", "IP_Adresse"), sd = TRUE, missing = TRUE, freq = FALSE))
 
   
 }
@@ -87,7 +89,7 @@ for (flug in unique(df6$Flughafen_Airline)){
   df6_single <- df6 %>% dplyr::filter(Flughafen_Airline == flug)
   
   # Plot Box_Plot
-  gp<-ggplot(df6, aes(IP_Adresse, Preis)) +
+  gp<-ggplot(df6_single, aes(IP_Adresse, Preis)) +
   geom_boxplot(aes(fill = IP_Adresse), show.legend = TRUE) +
   geom_point() +
   ggtitle(paste('Flug:', flug))
@@ -106,7 +108,7 @@ for (flug in unique(df6$Flughafen_Airline)){
   df6_single <- df6 %>% dplyr::filter(Flughafen_Airline == flug)
   
   # Mehrfakorielle ANOVA:
-Anova6<-jmv::ANOVA(data = df6, 
+Anova6<-jmv::ANOVA(data = df6_single, 
                    dep = "Preis",
                    factors = c("IP_Adresse"),
                    modelTerms = list("IP_Adresse"),
