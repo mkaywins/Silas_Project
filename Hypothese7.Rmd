@@ -3,6 +3,7 @@ title: "Hypothese 8"
 author: "Silas Nöttling"
 date: "19 4 2020"
 output:
+  pdf_document: default
   html_document:
     df_print: paged
 ---
@@ -82,7 +83,7 @@ df7 <- df7 %>% dplyr::filter(DatumZeit %in% df7_date$DatumZeit)
 #df7$Datenzugriff <- as.factor(df7$Datenzugriff)
 
 df7$Datenzugriff <- droplevels(df7$Datenzugriff)
-levels(df7$Datenzugriff) <- c('Website', 'Reise-Website')
+levels(df7$Datenzugriff) <- c('Checkfelix Website', 'AUA Website')
 
 ```
 

@@ -3,6 +3,7 @@ title: "Hypothese 4"
 author: "Silas Nöttling"
 date: "19 4 2020"
 output:
+  pdf_document: default
   html_document:
     df_print: paged
 ---
@@ -51,7 +52,7 @@ levels(df$Airline) <- c('AUA', 'KLM', 'EZY', 'LDM', 'BAW', 'THA', 'UAL', 'ANA')
 df4 <- df %>%
   filter(Datenzugriff %in% c(0,1) & Cookies == TRUE & IP_Adresse == FALSE) %>% 
   unite(Flughafen_Airline, c("Flughafen", "Airline"), sep = "-") %>% 
-  select(Datum, Preis, Device, Flughafen_Airline) 
+  select(Datum, Preis, Device, Datenzugriff, Flughafen_Airline) 
 
 
 # Change factor levels:
@@ -67,7 +68,8 @@ df4_3 <- df4 %>% dplyr::filter(Device == 3)
 df4_date <- df4_1 %>% dplyr::inner_join(df4_3, by = 'Datum') %>% select(Datum) %>% unique()
 df4 <- df4 %>% dplyr::filter(Datum %in% df4_date$Datum)
 
-levels(df4$Device) <- c('Apple Ipad', 'Mac Book')
+df4$Datenzugriff <- droplevels(df4$Datenzugriff)
+levels(df4$Datenzugriff) <- c('Checkfelix Application', 'Checkfelix Website')
 ````
 
 ## Deskriptive Statistik - Einzelflüge

@@ -33,7 +33,7 @@ df <- readxl::read_excel("Data_Is_Key.xlsx")
 
 ```{r datawrangling, include=FALSE}
 # rename and convert Data
-df <- df %>% rename(Datum = `Datum (jjmmtt)`) %>% mutate(Datum = as.Date(Datum, format = "%y%m%d"))
+df <- df %>% rename(Wochentag = `Datum (jjmmtt)`) %>% mutate(Wochentag = as.Date(Wochentag, format = "%y%m%d"))
 
 df <- df %>% mutate_at(c("Flughafen", "Airline", "Zeit", "Device", "Datenzugriff"), as.factor) %>% 
   mutate_at(c("Cookies", "IP-Adresse"), as.logical)
@@ -48,11 +48,11 @@ levels(df$Airline) <- c('AUA', 'KLM', 'EZY', 'LDM', 'BAW', 'THA', 'UAL', 'ANA')
 # Hypothese 1 - Einzelflüge
 ```{r data_H1, fig.width=15, fig.height=7}
 # 1)
-# Modell 1: Preis in Abhängigkeit von Zeit und Datum
+# Modell 1: Preis in Abhängigkeit von Zeit und Wochentag
 
-# Dazu müssen wir zuerst Datum nach Mo, Di, Mi, ... kategorisieren
+# Dazu müssen wir zuerst Wochentag nach Mo, Di, Mi, ... kategorisieren
 
-df1 <- df %>% mutate(Datum = weekdays(Datum)) %>% mutate(Datum = factor(Datum, levels = c("Montag",
+df1 <- df %>% mutate(Wochentag = weekdays(Wochentag)) %>% mutate(Wochentag = factor(Wochentag, levels = c("Montag",
                                                                                           "Dienstag",
                                                                                           "Mittwoch",
                                                                                           "Donnerstag",
@@ -61,11 +61,11 @@ df1 <- df %>% mutate(Datum = weekdays(Datum)) %>% mutate(Datum = factor(Datum, l
                                                                                           "Sonntag"))) %>%
   filter(Device == 0 & Datenzugriff == 0 & Cookies == FALSE & IP_Adresse == FALSE) %>% 
   unite(Flughafen_Airline, c("Flughafen", "Airline"), sep = "-") %>% 
-  select(Flughafen_Airline,Preis, Datum, Zeit) 
+  select(Flughafen_Airline,Preis, Wochentag, Zeit) 
 # rename levels für Zeit
 levels(df1$Zeit) <- c("Morgen", "Mittag", "Abend")
 
-#levels(df1$Datum)
+#levels(df1$Wochentag)
 #str(df)
 ```
 
@@ -75,7 +75,7 @@ temp <- c()
 for (flug in unique(df1$Flughafen_Airline)){
   df1_single <- df1 %>% dplyr::filter(Flughafen_Airline == flug)
   
-  temp <- c(temp, jmv::descriptives(df1_single, vars = c("Preis", "Datum", "Zeit"), sd = TRUE, missing = TRUE, freq = TRUE))
+  temp <- c(temp, jmv::descriptives(df1_single, vars = c("Preis", "Wochentag", "Zeit"), sd = TRUE, missing = TRUE, freq = TRUE))
 }
 names(temp) <- paste('Flug:', unique(df1$Flughafen_Airline))
 temp
@@ -88,11 +88,11 @@ temp
 for (flug in unique(df1$Flughafen_Airline)){
   df1_single <- df1 %>% dplyr::filter(Flughafen_Airline == flug)
   
-  jmv::descriptives(df1_single, vars = c("Preis", "Datum", "Zeit"), sd = TRUE, missing = TRUE, freq = F)
+  jmv::descriptives(df1_single, vars = c("Preis", "Wochentag", "Zeit"), sd = TRUE, missing = TRUE, freq = F)
 
   # Plot Box_Plot
-  gp<-ggplot(df1_single, aes(Datum, Preis)) +
-    geom_boxplot(aes(fill = Datum), show.legend = TRUE) +
+  gp<-ggplot(df1_single, aes(Wochentag, Preis)) +
+    geom_boxplot(aes(fill = Wochentag), show.legend = TRUE) +
     geom_point() +
     facet_wrap(~Zeit) +
     ggtitle(paste('Flug:', flug))
@@ -113,11 +113,11 @@ for (flug in unique(df1$Flughafen_Airline)){
   
   Anova1<-jmv::ANOVA(data = df1_single, 
                      dep = "Preis",
-                     factors = c("Datum", "Zeit"),
-                     modelTerms = list("Datum", "Zeit"),
+                     factors = c("Wochentag", "Zeit"),
+                     modelTerms = list("Wochentag", "Zeit"),
                      effectSize = "partEta",
                      emMeans = list(
-                       c("Datum", "Zeit")
+                       c("Wochentag", "Zeit")
                      ),
                      emmTables = TRUE
   )

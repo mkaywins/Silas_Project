@@ -3,8 +3,8 @@ title: "Hypothese 3"
 author: "Silas Nöttling & Maximilian Kuttner"
 date: "14 4 2020"
 output:
-  html_document: default
   pdf_document: default
+  html_document: default
 ---
 
 ```{r setup, include=FALSE}
@@ -58,7 +58,7 @@ df3$Device <- df3$Device - 1
 df3 <- df3 %>% filter(Device %in% c(1,2))
 df3$Device <- as.factor(df3$Device)
 
-levels(df3$Device) <- c("Website", "Reise-Website")
+levels(df3$Device) <- c("Apple Ipad", "Samsung Galaxy")
 ````
 
 

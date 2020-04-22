@@ -3,9 +3,9 @@ title: "Silas_Analysis"
 author: "Max Kuttner"
 date: "25 3 2020"
 output:
-  pdf_document: default
-  word_document: default
   html_document: default
+  word_document: default
+  pdf_document: default
 ---
 
 ```{r setup, include=FALSE}
@@ -315,7 +315,7 @@ ggplot() +
 
 temp_box<-df_time_rel
 temp_box$Flughafen_Airline <- factor(temp_box$Flughafen_Airline) 
-levels(temp_box$Flughafen_Airline)<-c('AMS-AUA', 'AMS-KLM', 'BAW-AUA', 'BAW-THA', 'BER-AUA', 'BER-EZY', 'LSB-AUA', 'LSB-LDM', 'LDN-AUA', 'LDN-BAW', 'NY-AUA', 'NY-UAL', 'TOK-ANA', 'TOK-AUA')
+levels(temp_box$Flughafen_Airline)<-c('AMS-AUA', 'AMS-KLM', 'BKK-AUA', 'BKK-THA', 'TXL-AUA', 'TXL-EZY', 'LIS-AUA', 'LIS-LDM', 'LHR-AUA', 'LHR-BAW', 'EWR-AUA', 'EWR-UAL', 'HND-ANA', 'HND-AUA')
 ggplot(temp_box, aes(Flughafen_Airline, rel_t0)) +
   geom_boxplot(aes(fill = Flughafen_Airline), show.legend = TRUE) +
   geom_point() +
@@ -340,7 +340,7 @@ df3$Device <- df3$Device - 1
 df3 <- df3 %>% filter(Device %in% c(1,2))
 df3$Device <- as.factor(df3$Device)
 
-levels(df3$Device) <- c("Website", "Reise-Website")
+levels(df3$Device) <- c("Apple Ipad", "Samsung Galaxy")
 
 
 df3 <- df3 %>% left_join(df1_rel, by='Flughafen_Airline') %>% mutate(Preis = Preis/ersterPreis) %>% select(-ersterPreis)
@@ -384,7 +384,7 @@ Anova3
 df4 <- df %>%
   filter(Datenzugriff %in% c(0,1) & Cookies == TRUE & IP_Adresse == FALSE) %>% 
   unite(Flughafen_Airline, c("Flughafen", "Airline"), sep = "-") %>% 
-  select(Wochentag, Preis, Device, Flughafen_Airline) 
+  select(Wochentag, Preis, Device, Datenzugriff, Flughafen_Airline) 
 
 
 # Change factor levels:
@@ -400,7 +400,8 @@ df4_3 <- df4 %>% dplyr::filter(Device == 3)
 df4_date <- df4_1 %>% dplyr::inner_join(df4_3, by = 'Wochentag') %>% select(Wochentag) %>% unique()
 df4 <- df4 %>% dplyr::filter(Wochentag %in% df4_date$Wochentag)
 
-levels(df4$Device) <- c('Apple Ipad', 'Mac Book')
+df4$Datenzugriff <- droplevels(df4$Datenzugriff)
+levels(df4$Datenzugriff) <- c('Checkfelix Application', 'Checkfelix Website')
 
 df4 <- df4 %>% left_join(df1_rel, by='Flughafen_Airline') %>% mutate(Preis = Preis/ersterPreis) %>% select(-ersterPreis)
 
@@ -410,14 +411,14 @@ df4 <- df4 %>% left_join(df1_rel, by='Flughafen_Airline') %>% mutate(Preis = Pre
 
 ```{r DStat_H4, echo=FALSE}
 # Deskreptive Statistik:
-jmv::descriptives(df4, vars = c("Preis", "Device"), sd = TRUE, missing = TRUE, freq = TRUE)
+jmv::descriptives(df4, vars = c("Preis", "Datenzugriff"), sd = TRUE, missing = TRUE, freq = TRUE)
 ```
 
 ### Verteilung - BoxPlot
 ```{r boxplot_H4, fig.width=10, fig.height=7}
 # Plot Box_Plot
-ggplot(df4, aes(Device, Preis)) +
-  geom_boxplot(aes(fill = Device), show.legend = TRUE) +
+ggplot(df4, aes(Datenzugriff, Preis)) +
+  geom_boxplot(aes(fill = Datenzugriff), show.legend = TRUE) +
   geom_point()
 ```
 
@@ -427,10 +428,10 @@ ggplot(df4, aes(Device, Preis)) +
 
 Anova4<-jmv::ANOVA(data = df4, 
                    dep = "Preis",
-                   factors = c("Device"),
-                   modelTerms = list("Device"),
+                   factors = c("Datenzugriff"),
+                   modelTerms = list("Datenzugriff"),
                    effectSize = "partEta",
-                   emMeans = list("Device"
+                   emMeans = list("Datenzugriff"
                    ),
                    emmTables = TRUE)
 Anova4
@@ -618,7 +619,7 @@ df7 <- df7 %>% filter(Datenzugriff %in% c(1,2))
 df7$Datenzugriff <- as.factor(df7$Datenzugriff)
 
 
-levels(df7$Datenzugriff) <- c('Website', 'Reise-Website')
+levels(df7$Datenzugriff) <- c( 'Checkfelix Website', 'AUA Website')
 
 ```
 
