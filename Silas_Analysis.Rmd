@@ -3,9 +3,9 @@ title: "Silas_Analysis"
 author: "Max Kuttner"
 date: "25 3 2020"
 output:
-  html_document: default
-  word_document: default
   pdf_document: default
+  word_document: default
+  html_document: default
 ---
 
 ```{r setup, include=FALSE}
@@ -184,7 +184,7 @@ ggplot() +
   geom_line(data = df_time_fity, aes(x = Wochentag, y = fitted, color = "Fitted")) +
   scale_color_manual(name = "Lines", 
                      values = c("Data" = "black", "Fitted" = "red")) +
-  ylab("Preis in Prozent zu t=0")+
+  ylab("Preis in Verhältnis zu t=0")+
   xlab('Zeit') +
   ggtitle('Zeitreihe - Flugpreise')
 ````
@@ -196,7 +196,7 @@ ggplot() +
 
 autoplot(fore) +
   xlab("Zeit") +
-  ylab("Preis") 
+  ylab("Preis im Verhältnis zu t=0") 
 
 ````
 
@@ -271,7 +271,7 @@ for (flug in unique(df_time$Flughafen_Airline)){
 }
 ````
 
-### Relative Veränderung zu t=0
+### Preis im Verhältnis zu t=0
 ````{r, fig.width=15, fig.height=7, warning = FALSE, message = FALSE}
 df_time_rel <- df %>%
   filter(Device == 0 & Datenzugriff == 0 & Cookies == FALSE & IP_Adresse == FALSE) %>% 
@@ -293,8 +293,8 @@ colnames(df_time_rel)[4] <- 'relative_change'
 
 ggplot(data=df_time_rel, aes(x=Wochentag, y=rel_t0)) +
   geom_line(aes(group = Flughafen_Airline, colour = Flughafen_Airline )) +
-  ggtitle('Relative Veränderung - Flugpreise pro Flug') +
-  ylab('relative Veränderung zu t=0') +
+  ggtitle('Preis im Verhältnis zu t=0 - Flugpreise pro Flug') +
+  ylab('Preis im Verhältnis zu t=0') +
   xlab('Zeit')
 ````
 
