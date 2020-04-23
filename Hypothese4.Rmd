@@ -3,9 +3,9 @@ title: "Hypothese 4"
 author: "Silas Nöttling"
 date: "19 4 2020"
 output:
-  pdf_document: default
   html_document:
     df_print: paged
+  pdf_document: default
 ---
 
 ```{r setup, include=FALSE}
@@ -81,7 +81,7 @@ for (flug in unique(df4$Flughafen_Airline)){
   df4_single <- df4 %>% dplyr::filter(Flughafen_Airline == flug)
   
   # Deskreptive Statistik:
-    temp <- c(temp, jmv::descriptives(df4_single, vars = c("Preis", "Device"), sd = TRUE, missing = TRUE, freq = F))
+    temp <- c(temp, jmv::descriptives(df4_single, vars = c("Preis", "Datenzugriff"), sd = TRUE, missing = TRUE, freq = F))
 
   
 }
@@ -96,8 +96,8 @@ for (flug in unique(df4$Flughafen_Airline)){
   df4_single <- df4 %>% dplyr::filter(Flughafen_Airline == flug)
   
   # Plot Box_Plot
-  gp<-ggplot(df4_single, aes(Device, Preis)) +
-  geom_boxplot(aes(fill = Device), show.legend = TRUE) +
+  gp<-ggplot(df4_single, aes(Datenzugriff, Preis)) +
+  geom_boxplot(aes(fill = Datenzugriff), show.legend = TRUE) +
   geom_point() +
     ggtitle(paste('Flug:', flug))
   
@@ -117,10 +117,10 @@ for (flug in unique(df4$Flughafen_Airline)){
   # Mehrfakorielle ANOVA:
 Anova4<-jmv::ANOVA(data = df4_single, 
                    dep = "Preis",
-                   factors = c("Device"),
-                   modelTerms = list("Device"),
+                   factors = c("Datenzugriff"),
+                   modelTerms = list("Datenzugriff"),
                    effectSize = "partEta",
-                   emMeans = list("Device"
+                   emMeans = list("Datenzugriff"
                    ),
                    emmTables = TRUE,
                    emmPlots = FALSE)
