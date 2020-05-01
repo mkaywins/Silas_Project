@@ -294,6 +294,34 @@ ggplot(data=df_time_rel, aes(x=Wochentag, y=rel_t0)) +
   ylab('Preis im Verhältnis zu t=0') +
   xlab('Zeit')
 ````
+### Langstrecke versus Kurzstrecke
+````{r, fig.width = 15, fig.height = 7, warning = FALSE}
+
+df_time_longshort <- df_time_rel %>% mutate(Kategorie = factor(if_else(Flughafen_Airline %in% c(
+  'Amsterdam-AUA','Amsterdam-KLM', 'Berlin-AUA', 'Berlin-EZY', 'Lissabon-AUA', 'Lissabon-LDM', 'London-AUA', 'London-BAW'
+), 'Kurzstrecke', 'Langstrecke')))
+
+df_time_longshort <- df_time_longshort %>% group_by(Wochentag, Kategorie) %>% summarise(Preis = mean(rel_t0)) 
+
+ggplot(df_time_longshort, aes(Wochentag, Preis)) +
+  geom_line(aes(group = Kategorie, colour = Kategorie)) +
+    ggtitle('Preis im Verhältnis zu t=0 - Flugpreise: Langstrecke versus Kurzstrecke') +
+  ylab('Preis im Verhältnis zu t=0') +
+  xlab('Zeit')
+````
+````{r}
+jmv::descriptives(df_time_longshort, vars = c("Preis", "Kategorie"), sd = TRUE, missing = TRUE, freq = TRUE)
+````
+````{r}
+Anova_longshort<-jmv::ANOVA(data = df_time_longshort, 
+                   dep = "Preis",
+                   factors = c("Kategorie"),
+                   emMeans = list("Kategorie"
+                   ),
+                   emmTables = TRUE)
+Anova_longshort
+````
+
 
 ````{r, fig.width=15, fig.height=7, warning = FALSE}
 df_time_rel2 <- df_time_rel %>% group_by(Wochentag) %>% summarise(mean_rel = mean(relative_change))
@@ -309,9 +337,8 @@ ggplot() +
 
 ```{r boxplot_EXTRA, fig.width=15, fig.height=7}
 # Plot Box_Plot
-
 temp_box<-df_time_rel
-temp_box$Flughafen_Airline <- factor(temp_box$Flughafen_Airline) 
+temp_box$Flughafen_Airline <- factor(temp_box$Flughafen_Airline)
 levels(temp_box$Flughafen_Airline)<-c('AMS-AUA', 'AMS-KLM', 'BKK-AUA', 'BKK-THA', 'TXL-AUA', 'TXL-EZY', 'LIS-AUA', 'LIS-LDM', 'LHR-AUA', 'LHR-BAW', 'EWR-AUA', 'EWR-UAL', 'HND-ANA', 'HND-AUA')
 ggplot(temp_box, aes(Flughafen_Airline, rel_t0)) +
   geom_boxplot(aes(fill = Flughafen_Airline), show.legend = TRUE) +
